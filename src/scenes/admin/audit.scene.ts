@@ -11,7 +11,7 @@ const PAGE_SIZE = 10;
 
 const ACTION_ICONS: Record<AuditAction, string> = {
   CREATE: '+',
-  UPDATE: '/',
+  UPDATE: '|',
   DELETE: 'x',
 };
 
@@ -57,6 +57,11 @@ function formatAuditEntry(log: {
   return lines.join('\n');
 }
 
+/** Escape _ and * so Telegram Markdown doesn't treat them as italic/bold (e.g. in SALARY_ADJUSTMENT, JSON). */
+function escapeMarkdownBody(s: string): string {
+  return s.split('*').join('\\*').split('_').join('\\_');
+}
+
 async function showAuditPage(ctx: BotContext, page: number): Promise<void> {
   const total = await prisma.auditLog.count();
   const totalPages = Math.ceil(total / PAGE_SIZE);
@@ -74,9 +79,9 @@ async function showAuditPage(ctx: BotContext, page: number): Promise<void> {
     return;
   }
 
-  const text = [`*Аудит-лог* (стр. ${safePage + 1}/${Math.max(totalPages, 1)})`, '']
-    .concat(logs.map(formatAuditEntry))
-    .join('\n\n');
+  const title = `*Аудит-лог* (стр. ${safePage + 1}/${Math.max(totalPages, 1)})\nПометки: + создание, | изменение, x удаление`;
+  const body = logs.map((log) => escapeMarkdownBody(formatAuditEntry(log))).join('\n');
+  const text = [title, '', body].join('\n');
 
   const navButtons: ReturnType<typeof Markup.button.callback>[] = [];
   if (safePage > 0) navButtons.push(Markup.button.callback('<< Пред', `audit_page_${safePage - 1}`));
