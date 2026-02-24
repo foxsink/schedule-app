@@ -10,6 +10,7 @@ import { registerEmployeeActions } from './scenes/employee/actions';
 import { adminMenuScene, ADMIN_MENU_SCENE_ID } from './scenes/admin/menu.scene';
 import { adminScheduleScene } from './scenes/admin/schedule.scene';
 import { adminReportWizard } from './scenes/admin/report.wizard';
+import { adminEditWizard } from './scenes/admin/edit.wizard';
 
 export function createBot(): Telegraf<BotContext> {
   const bot = new Telegraf<BotContext>(config.botToken);
@@ -21,6 +22,7 @@ export function createBot(): Telegraf<BotContext> {
     adminMenuScene,
     adminScheduleScene,
     adminReportWizard,
+    adminEditWizard,
   ]);
 
   bot.use(sessionMiddleware);

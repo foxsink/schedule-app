@@ -16,6 +16,7 @@ adminMenuScene.enter(async (ctx) => {
   const rows = [
     [Markup.button.callback('📋 Расписание', 'admin_schedule')],
     [Markup.button.callback('📊 Отчёты', 'admin_reports')],
+    [Markup.button.callback('✏️ Редактирование записей', 'admin_edit')],
     [Markup.button.callback('👥 Сотрудники', 'admin_employees')],
     [Markup.button.callback('💰 Зарплаты', 'admin_salaries')],
     [Markup.button.callback('📥 Экспорт', 'admin_export')],
@@ -35,6 +36,11 @@ adminMenuScene.action('admin_schedule', async (ctx) => {
 adminMenuScene.action('admin_reports', async (ctx) => {
   await ctx.answerCbQuery();
   return ctx.scene.enter('admin_report');
+});
+
+adminMenuScene.action('admin_edit', async (ctx) => {
+  await ctx.answerCbQuery();
+  return ctx.scene.enter('admin_edit');
 });
 
 adminMenuScene.action('admin_employees', async (ctx) => {

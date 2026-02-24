@@ -1,6 +1,7 @@
 import { prisma } from '../prisma';
-import { TimeEntryType } from '@prisma/client';
+import { AuditAction, AuditEntityType, TimeEntryType } from '@prisma/client';
 import { nowUTC7, todayDateUTC7 } from '../utils/time';
+import { auditService } from './audit.service';
 
 export type AvailableAction =
   | 'work_start'
@@ -88,5 +89,63 @@ export const timeEntryService = {
         date,
       },
     });
+  },
+
+  async getEntriesByDate(employeeId: number, date: Date) {
+    return prisma.timeEntry.findMany({
+      where: { employeeId, date },
+      orderBy: { timestamp: 'asc' },
+    });
+  },
+
+  async createEntryManual(
+    editorId: number,
+    employeeId: number,
+    type: TimeEntryType,
+    timestamp: Date,
+    date: Date
+  ) {
+    const entry = await prisma.timeEntry.create({
+      data: { employeeId, type, timestamp, date },
+    });
+    await auditService.log(
+      editorId,
+      AuditAction.CREATE,
+      AuditEntityType.TIME_ENTRY,
+      entry.id,
+      null,
+      { id: entry.id, employeeId, type, timestamp, date }
+    );
+    return entry;
+  },
+
+  async updateEntry(editorId: number, entryId: number, newTimestamp: Date) {
+    const old = await prisma.timeEntry.findUniqueOrThrow({ where: { id: entryId } });
+    const updated = await prisma.timeEntry.update({
+      where: { id: entryId },
+      data: { timestamp: newTimestamp },
+    });
+    await auditService.log(
+      editorId,
+      AuditAction.UPDATE,
+      AuditEntityType.TIME_ENTRY,
+      entryId,
+      { id: old.id, type: old.type, timestamp: old.timestamp },
+      { id: updated.id, type: updated.type, timestamp: newTimestamp }
+    );
+    return updated;
+  },
+
+  async deleteEntry(editorId: number, entryId: number) {
+    const old = await prisma.timeEntry.findUniqueOrThrow({ where: { id: entryId } });
+    await prisma.timeEntry.delete({ where: { id: entryId } });
+    await auditService.log(
+      editorId,
+      AuditAction.DELETE,
+      AuditEntityType.TIME_ENTRY,
+      entryId,
+      { id: old.id, type: old.type, timestamp: old.timestamp },
+      null
+    );
   },
 };
