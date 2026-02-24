@@ -99,8 +99,13 @@ async function showAddTypeMenu(
   const existingTypes = new Set(entries.map((e) => e.type));
   const prevTypes = new Set(prevDayEntries.map((e) => e.type));
 
+  // If today already has WORK_END without WORK_START, the cross-midnight shift is already closed
+  const todayHasCrossMidnightEnd =
+    existingTypes.has(TimeEntryType.WORK_END) && !existingTypes.has(TimeEntryType.WORK_START);
   const prevDayShiftOpen =
-    prevTypes.has(TimeEntryType.WORK_START) && !prevTypes.has(TimeEntryType.WORK_END);
+    prevTypes.has(TimeEntryType.WORK_START) &&
+    !prevTypes.has(TimeEntryType.WORK_END) &&
+    !todayHasCrossMidnightEnd;
 
   const SINGLE_USE: TimeEntryType[] = [
     TimeEntryType.WORK_START, TimeEntryType.WORK_END,
