@@ -88,18 +88,23 @@ async function showEntryActions(ctx: BotContext, entryId: number): Promise<void>
   );
 }
 
-async function showAddTypeMenu(ctx: BotContext, existingTypes: Set<TimeEntryType>): Promise<void> {
+async function showAddTypeMenu(ctx: BotContext, entries: Array<{ type: TimeEntryType }>): Promise<void> {
+  const count = (t: TimeEntryType) => entries.filter((e) => e.type === t).length;
+  const existingTypes = new Set(entries.map((e) => e.type));
+
   const SINGLE_USE: TimeEntryType[] = [
     TimeEntryType.WORK_START, TimeEntryType.WORK_END,
     TimeEntryType.LUNCH_START, TimeEntryType.LUNCH_END,
     TimeEntryType.SICK_LEAVE,
   ];
   const onSickLeave = existingTypes.has(TimeEntryType.SICK_LEAVE);
+  // Use counts for accuracy with multiple leave/lunch periods
+  const onLunch = count(TimeEntryType.LUNCH_START) > count(TimeEntryType.LUNCH_END);
+  const onLeave = count(TimeEntryType.PERSONAL_LEAVE_START) > count(TimeEntryType.PERSONAL_LEAVE_END);
+
   const rows = Object.entries(TYPE_LABELS).map(([type, label]) => {
     const t = type as TimeEntryType;
     const noWorkStart = !existingTypes.has(TimeEntryType.WORK_START);
-    const onLunch = existingTypes.has(TimeEntryType.LUNCH_START) && !existingTypes.has(TimeEntryType.LUNCH_END);
-    const onLeave = existingTypes.has(TimeEntryType.PERSONAL_LEAVE_START) && !existingTypes.has(TimeEntryType.PERSONAL_LEAVE_END);
     const alreadyDone = SINGLE_USE.includes(t) && existingTypes.has(t);
     const requiresWorkStart = noWorkStart && t !== TimeEntryType.WORK_START && t !== TimeEntryType.SICK_LEAVE;
     const sickLeaveBlocked = t === TimeEntryType.SICK_LEAVE && existingTypes.has(TimeEntryType.WORK_START);
@@ -276,8 +281,7 @@ adminEditWizard.action('edit_add', async (ctx) => {
   if (!empId || !dateStr) return;
   const date = new Date(`${dateStr}T00:00:00.000Z`);
   const entries = await timeEntryService.getEntriesByDate(empId, date);
-  const existingTypes = new Set(entries.map((e) => e.type));
-  await showAddTypeMenu(ctx, existingTypes);
+  await showAddTypeMenu(ctx, entries);
 });
 
 // Add entry — type selected
@@ -302,6 +306,7 @@ adminEditWizard.action(/^edit_add_type_(.+)$/, async (ctx) => {
   if (type === TimeEntryType.LUNCH_END) {
     const date = new Date(`${dateStr}T00:00:00.000Z`);
     const entries = await timeEntryService.getEntriesByDate(empId, date);
+    // entries already fetched, reused below
     const lunchStart = entries.find((e) => e.type === TimeEntryType.LUNCH_START);
     if (lunchStart) {
       const t30 = new Date(lunchStart.timestamp.getTime() + 30 * 60_000);
