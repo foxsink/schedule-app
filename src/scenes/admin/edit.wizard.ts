@@ -85,10 +85,15 @@ async function showEntryActions(ctx: BotContext, entryId: number): Promise<void>
 }
 
 async function showAddTypeMenu(ctx: BotContext, existingTypes: Set<TimeEntryType>): Promise<void> {
-  const INACTIVE: TimeEntryType[] = [TimeEntryType.LUNCH_START, TimeEntryType.LUNCH_END];
+  const SINGLE_USE: TimeEntryType[] = [
+    TimeEntryType.WORK_START, TimeEntryType.WORK_END,
+    TimeEntryType.LUNCH_START, TimeEntryType.LUNCH_END,
+    TimeEntryType.SICK_LEAVE,
+  ];
+  const onSickLeave = existingTypes.has(TimeEntryType.SICK_LEAVE);
   const rows = Object.entries(TYPE_LABELS).map(([type, label]) => {
     const t = type as TimeEntryType;
-    const inactive = INACTIVE.includes(t) && existingTypes.has(t);
+    const inactive = onSickLeave || (SINGLE_USE.includes(t) && existingTypes.has(t));
     return [
       inactive
         ? Markup.button.callback(`✓ ${label}`, 'noop')
