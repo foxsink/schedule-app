@@ -34,7 +34,11 @@ async function main() {
     });
     console.log(`Bot started in webhook mode on port ${config.port} (${config.webhookDomain}${config.webhookPath})`);
   } else {
-    await bot.launch();
+    // In polling mode bot.launch() never resolves — run without await
+    bot.launch().catch((err) => {
+      console.error('Polling error:', err);
+      process.exit(1);
+    });
     console.log('Bot started in polling mode');
   }
 }
