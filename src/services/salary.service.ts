@@ -51,8 +51,12 @@ export const salaryService = {
       where: { id: employeeId },
     });
 
+    // Extend range by 1 day in each direction to detect cross-midnight shifts
+    const fromExtended = new Date(from.getTime() - 86_400_000);
+    const toExtended = new Date(to.getTime() + 86_400_000);
+
     const entries = await prisma.timeEntry.findMany({
-      where: { employeeId, date: { gte: from, lte: to } },
+      where: { employeeId, date: { gte: fromExtended, lte: toExtended } },
       orderBy: [{ date: 'asc' }, { timestamp: 'asc' }],
     });
 
@@ -64,23 +68,68 @@ export const salaryService = {
       byDate.get(key)!.push(e);
     }
 
+    const sortedDates = Array.from(byDate.keys()).sort();
+    // Track WORK_END entries consumed by the previous day (cross-midnight case)
+    const consumedEntryIds = new Set<number>();
+
     const days: DaySalary[] = [];
     let totalWorkedMs = 0;
     let grossSalary = 0;
 
-    for (const [dateKey, dayEntries] of byDate) {
+    for (const dateKey of sortedDates) {
       const date = new Date(`${dateKey}T00:00:00.000Z`);
+      // Days outside the range are processed for cross-midnight consumption only
+      const isInRange = date >= from && date <= to;
+
+      const dayEntries = byDate.get(dateKey)!;
       const types = dayEntries.map((e) => e.type);
 
       if (types.includes(TimeEntryType.SICK_LEAVE)) {
-        days.push({ date: dateKey, netHours: 0, rate: 0, amount: 0, sickLeave: true });
+        if (isInRange) days.push({ date: dateKey, netHours: 0, rate: 0, amount: 0, sickLeave: true });
         continue;
       }
 
-      const get = (t: TimeEntryType) => dayEntries.find((e) => e.type === t);
+      const get = (t: TimeEntryType) =>
+        dayEntries.find((e) => e.type === t && !consumedEntryIds.has(e.id));
+
       const workStart = get(TimeEntryType.WORK_START);
-      const workEnd = get(TimeEntryType.WORK_END);
+      let workEnd = get(TimeEntryType.WORK_END);
+
+      // Cross-midnight case A: WORK_END is on same calendar day but its timestamp
+      // is earlier than WORK_START — the shift started the previous day and ended after midnight.
+      // Consume this WORK_END so the previous day can claim it (it should have been consumed
+      // during prev-day processing if prev day was fetched; this handles the fallback).
+      if (workStart && workEnd && workEnd.timestamp.getTime() < workStart.timestamp.getTime()) {
+        const prevDateKey = new Date(date.getTime() - 86_400_000).toISOString().slice(0, 10);
+        const prevDayEntries = byDate.get(prevDateKey) ?? [];
+        const prevHasStart = prevDayEntries.some(
+          (e) => e.type === TimeEntryType.WORK_START && !consumedEntryIds.has(e.id),
+        );
+        const prevHasEnd = prevDayEntries.some(
+          (e) => e.type === TimeEntryType.WORK_END && !consumedEntryIds.has(e.id),
+        );
+        if (prevHasStart && !prevHasEnd) {
+          consumedEntryIds.add(workEnd.id);
+          workEnd = null;
+        }
+      }
+
+      // Cross-midnight case B: WORK_END recorded on next calendar day
+      if (workStart && !workEnd) {
+        const nextDateKey = new Date(date.getTime() + 86_400_000).toISOString().slice(0, 10);
+        const nextDayEntries = byDate.get(nextDateKey) ?? [];
+        const crossDayEnd = nextDayEntries.find(
+          (e) => e.type === TimeEntryType.WORK_END && !consumedEntryIds.has(e.id),
+        );
+        if (crossDayEnd) {
+          workEnd = crossDayEnd;
+          consumedEntryIds.add(crossDayEnd.id);
+        }
+      }
+
       if (!workStart || !workEnd) continue;
+
+      if (!isInRange) continue;
 
       let ms = workEnd.timestamp.getTime() - workStart.timestamp.getTime();
 

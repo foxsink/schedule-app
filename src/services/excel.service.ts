@@ -1,7 +1,7 @@
 import ExcelJS from 'exceljs';
 import { prisma } from '../prisma';
 import { salaryService } from './salary.service';
-import { formatDate, formatTime } from '../utils/time';
+import { formatDate } from '../utils/time';
 import { TimeEntryType } from '@prisma/client';
 
 export const excelService = {
@@ -98,12 +98,9 @@ export const excelService = {
           where: { employeeId: result.employeeId, date },
           orderBy: { timestamp: 'asc' },
         });
-        const get = (t: TimeEntryType) => entries.find((e) => e.type === t);
 
-        const workStart = get(TimeEntryType.WORK_START);
-        const workEnd   = get(TimeEntryType.WORK_END);
-        const lunchS    = get(TimeEntryType.LUNCH_START);
-        const lunchE    = get(TimeEntryType.LUNCH_END);
+        const lunchS = entries.find((e) => e.type === TimeEntryType.LUNCH_START);
+        const lunchE = entries.find((e) => e.type === TimeEntryType.LUNCH_END);
 
         const lunchMs = lunchS && lunchE ? lunchE.timestamp.getTime() - lunchS.timestamp.getTime() : 0;
         const plStarts = entries.filter((e) => e.type === TimeEntryType.PERSONAL_LEAVE_START);
@@ -119,8 +116,9 @@ export const excelService = {
         detailSheet.addRow({
           date:      formatDate(date),
           name:      `${result.lastName} ${result.firstName}`,
-          start:     workStart ? formatTime(workStart.timestamp) : (isSick ? 'Больничный' : '—'),
-          end:       workEnd   ? formatTime(workEnd.timestamp)   : '—',
+          // Use pre-computed times from salary service (handles cross-midnight correctly)
+          start:     day.workStart ?? (isSick ? 'Больничный' : '—'),
+          end:       day.workEnd   ?? '—',
           lunch:     Math.round((lunchMs  / 3_600_000) * 100) / 100 || '',
           leaves:    Math.round((leavesMs / 3_600_000) * 100) / 100 || '',
           hours:     day.netHours || '',

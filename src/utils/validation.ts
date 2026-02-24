@@ -8,11 +8,12 @@ export function parseTime(str: string): { hours: number; minutes: number } | nul
   return { hours, minutes };
 }
 
-/** Parse "DD.MM.YYYY" → UTC Date (midnight) or null */
+/** Parse "DD.MM.YY" → UTC Date (midnight) or null */
 export function parseDate(str: string): Date | null {
-  const match = str.trim().match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+  const match = str.trim().match(/^(\d{2})\.(\d{2})\.(\d{2})$/);
   if (!match) return null;
-  const [, day, month, year] = match;
+  const [, day, month, yy] = match;
+  const year = `20${yy}`;
   const date = new Date(`${year}-${month}-${day}T00:00:00.000Z`);
   return isNaN(date.getTime()) ? null : date;
 }

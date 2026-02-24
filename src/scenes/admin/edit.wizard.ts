@@ -40,7 +40,7 @@ async function showDateMenu(ctx: BotContext): Promise<void> {
     ],
     [Markup.button.callback('« Назад', 'edit_emp_back')],
   ]);
-  await ctx.reply('Введите дату (ДД.ММ.ГГГГ) или выберите:', keyboard);
+  await ctx.reply('Введите дату (ДД.ММ.ГГ) или выберите:', keyboard);
 }
 
 async function showEntriesList(ctx: BotContext, employeeId: number, date: Date): Promise<void> {
@@ -144,7 +144,7 @@ export const adminEditWizard = new Scenes.WizardScene<BotContext>(
     }
     const date = parseDate(ctx.message.text);
     if (!date) {
-      await ctx.reply('Неверный формат. Введите дату в формате ДД.ММ.ГГГГ:');
+      await ctx.reply('Неверный формат. Введите дату в формате ДД.ММ.ГГ:');
       return;
     }
     const empId = ctx.scene.session.selectedEmployeeId;
@@ -267,9 +267,55 @@ adminEditWizard.action(/^edit_delete_(\d+)$/, async (ctx) => {
   const dateStr = ctx.scene.session.selectedPeriodFrom;
   if (!editorId || !empId || !dateStr) return ctx.scene.leave();
   const entryId = parseInt(ctx.match[1], 10);
-  await timeEntryService.deleteEntry(editorId, entryId);
-  await ctx.reply('🗑 Запись удалена.');
   const date = new Date(`${dateStr}T00:00:00.000Z`);
+
+  const entry = await prisma.timeEntry.findUnique({ where: { id: entryId } });
+  if (!entry) {
+    await ctx.reply('Запись не найдена.');
+    await showEntriesList(ctx, empId, date);
+    return;
+  }
+
+  const allEntries = await timeEntryService.getEntriesByDate(empId, date);
+
+  if (entry.type === TimeEntryType.WORK_START) {
+    // Delete all entries for the day
+    for (const e of allEntries) {
+      await timeEntryService.deleteEntry(editorId, e.id);
+    }
+    await ctx.reply('🗑 Начало дня удалено — все записи за этот день удалены.');
+  } else if (entry.type === TimeEntryType.LUNCH_START) {
+    // Delete lunch end too if present
+    const lunchEnd = allEntries.find((e) => e.type === TimeEntryType.LUNCH_END);
+    await timeEntryService.deleteEntry(editorId, entryId);
+    if (lunchEnd) {
+      await timeEntryService.deleteEntry(editorId, lunchEnd.id);
+      await ctx.reply('🗑 Обед и конец обеда удалены.');
+    } else {
+      await ctx.reply('🗑 Запись удалена.');
+    }
+  } else if (entry.type === TimeEntryType.PERSONAL_LEAVE_START) {
+    // Find corresponding PERSONAL_LEAVE_END by index
+    const leaveStarts = allEntries
+      .filter((e) => e.type === TimeEntryType.PERSONAL_LEAVE_START)
+      .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+    const leaveEnds = allEntries
+      .filter((e) => e.type === TimeEntryType.PERSONAL_LEAVE_END)
+      .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+    const idx = leaveStarts.findIndex((e) => e.id === entryId);
+    const correspondingEnd = idx >= 0 && idx < leaveEnds.length ? leaveEnds[idx] : null;
+    await timeEntryService.deleteEntry(editorId, entryId);
+    if (correspondingEnd) {
+      await timeEntryService.deleteEntry(editorId, correspondingEnd.id);
+      await ctx.reply('🗑 Отлучка и возврат удалены.');
+    } else {
+      await ctx.reply('🗑 Запись удалена.');
+    }
+  } else {
+    await timeEntryService.deleteEntry(editorId, entryId);
+    await ctx.reply('🗑 Запись удалена.');
+  }
+
   await showEntriesList(ctx, empId, date);
 });
 
