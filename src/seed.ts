@@ -14,8 +14,8 @@ export async function seedSuperAdmin(): Promise<void> {
     await prisma.employee.create({
       data: {
         telegramId: superAdminTelegramId,
-        firstName: 'Super',
-        lastName: 'Admin',
+        firstName: config.superAdminFirstName,
+        lastName: config.superAdminLastName,
         role: Role.SUPER_ADMIN,
         invitationCode: null,
       },

@@ -17,5 +17,7 @@ export const config = {
   superAdminTelegramId: process.env.SUPER_ADMIN_TELEGRAM_ID
     ? BigInt(process.env.SUPER_ADMIN_TELEGRAM_ID)
     : undefined,
+  superAdminFirstName: process.env.SUPER_ADMIN_FIRST_NAME || 'Влад',
+  superAdminLastName: process.env.SUPER_ADMIN_LAST_NAME || 'Филимонов',
   TZ_OFFSET: 7,
 } as const;
