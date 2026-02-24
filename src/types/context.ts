@@ -1,7 +1,7 @@
 import { Context, Scenes } from 'telegraf';
 import { Employee } from '@prisma/client';
 
-export interface SessionData extends Scenes.SceneSessionData {
+export interface SessionData extends Scenes.WizardSessionData {
   selectedEmployeeId?: number;
   selectedDate?: string;
   selectedPeriodFrom?: string;
@@ -9,7 +9,7 @@ export interface SessionData extends Scenes.SceneSessionData {
 }
 
 export interface BotContext extends Context {
-  session: SessionData;
+  session: Scenes.WizardSession<SessionData>;
   scene: Scenes.SceneContextScene<BotContext, SessionData>;
   wizard: Scenes.WizardContextWizard<BotContext>;
   employee?: Employee | null;

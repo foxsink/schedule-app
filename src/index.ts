@@ -1,14 +1,12 @@
 import { createBot } from './bot';
 import { config } from './config';
 import { prisma } from './prisma';
+import { seedSuperAdmin } from './seed';
 
 async function main() {
-  const bot = createBot();
+  await seedSuperAdmin();
 
-  // Temporary /start handler (replaced in Phase 2)
-  bot.command('start', (ctx) => {
-    ctx.reply('Бот запущен. Авторизация будет добавлена позже.');
-  });
+  const bot = createBot();
 
   process.once('SIGINT', () => {
     bot.stop('SIGINT');
