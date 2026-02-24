@@ -101,7 +101,7 @@ async function showAddTypeMenu(ctx: BotContext, existingTypes: Set<TimeEntryType
     const inactive = onSickLeave || requiresWorkStart || sickLeaveBlocked || lunchEndBlocked || returnBlocked || (SINGLE_USE.includes(t) && existingTypes.has(t));
     return [
       inactive
-        ? Markup.button.callback(`✓ ${label}`, 'noop')
+        ? Markup.button.callback(`❌ ${label}`, 'noop')
         : Markup.button.callback(label, `edit_add_type_${type}`),
     ];
   });
