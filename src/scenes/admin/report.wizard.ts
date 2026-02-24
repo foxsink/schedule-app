@@ -1,7 +1,8 @@
 import { Scenes, Markup } from 'telegraf';
 import { BotContext } from '../../types/context';
 import { prisma } from '../../prisma';
-import { reportService, msToHoursStr } from '../../services/report.service';
+import { msToHoursStr } from '../../services/report.service';
+import { salaryService } from '../../services/salary.service';
 import { formatDate, nowUTC7, todayDateUTC7 } from '../../utils/time';
 import { ADMIN_MENU_SCENE_ID } from './menu.scene';
 import { PERIOD_KEYBOARD } from '../../keyboards/admin.keyboard';
@@ -16,28 +17,112 @@ function parseDate(str: string): Date | null {
   return isNaN(date.getTime()) ? null : date;
 }
 
+const DAY_NAMES = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+
+function hoursStr(h: number): string {
+  const hh = Math.floor(h);
+  const mm = Math.round((h - hh) * 60);
+  return mm > 0 ? `${hh}ч ${mm}м` : `${hh}ч`;
+}
+
+function fmtMoney(n: number): string {
+  return `${n.toLocaleString('ru-RU')}₽`;
+}
+
+async function sendPages(ctx: BotContext, lines: string[]): Promise<void> {
+  const pages: string[] = [];
+  let cur = '';
+  for (const line of lines) {
+    const candidate = cur ? `${cur}\n${line}` : line;
+    if (candidate.length > 3800 && cur) { pages.push(cur); cur = line; }
+    else cur = candidate;
+  }
+  if (cur) pages.push(cur);
+  for (const page of pages) await ctx.reply(page, { parse_mode: 'Markdown' });
+}
+
 async function showReport(ctx: BotContext, from: Date, to: Date): Promise<void> {
   const employeeId = ctx.scene.session.selectedEmployeeId;
-  const results = await reportService.getPeriodReport(from, to, employeeId);
-
   const fromStr = formatDate(from);
   const toStr = formatDate(to);
   const period = fromStr === toStr ? fromStr : `${fromStr} – ${toStr}`;
 
-  const lines = [`📊 *Отчёт за ${period}*`, ''];
+  // All employees — summary mode
+  if (!employeeId) {
+    const employees = await prisma.employee.findMany({
+      where: { isActive: true },
+      orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+    });
 
-  if (results.length === 0) {
-    lines.push('Нет данных за выбранный период.');
-  } else {
-    for (const r of results) {
-      lines.push(`👤 ${r.lastName} ${r.firstName}: *${msToHoursStr(r.totalMs)}* (${r.dayCount} дн.)`);
+    const lines: string[] = [`📊 *Отчёт за ${period}*`, ''];
+    let totalNet = 0;
+    let hasData = false;
+
+    for (const emp of employees) {
+      const r = await salaryService.calculateSalary(emp.id, from, to);
+      if (r.days.length === 0 && r.adjustments.length === 0) continue;
+      hasData = true;
+      totalNet += r.netSalary;
+      lines.push(`👤 *${r.lastName} ${r.firstName}*`);
+      lines.push(`  ⏱ ${hoursStr(r.totalWorkedHours)} → ${fmtMoney(r.grossSalary)}`);
+      if (r.bonuses > 0) lines.push(`  ➕ Премии: ${fmtMoney(r.bonuses)}`);
+      if (r.penalties > 0) lines.push(`  ➖ Штрафы: ${fmtMoney(r.penalties)}`);
+      lines.push(`  💰 К выплате: *${fmtMoney(r.netSalary)}*`);
+      lines.push('');
     }
-    const totalMs = results.reduce((acc, r) => acc + r.totalMs, 0);
-    lines.push('');
-    lines.push(`_Итого: ${msToHoursStr(totalMs)}_`);
+
+    if (!hasData) {
+      await ctx.reply(`📊 *Отчёт за ${period}*\n\nНет данных за выбранный период.`, { parse_mode: 'Markdown' });
+      return;
+    }
+    lines.push(`_Итого к выплате: ${fmtMoney(totalNet)}_`);
+    await sendPages(ctx, lines);
+    return;
   }
 
-  await ctx.reply(lines.join('\n'), { parse_mode: 'Markdown' });
+  // Single employee — detailed mode
+  const r = await salaryService.calculateSalary(employeeId, from, to);
+  const header = `📊 *${r.lastName} ${r.firstName} — ${period}*`;
+
+  if (r.days.length === 0 && r.adjustments.length === 0) {
+    await ctx.reply(`${header}\n\nНет данных за выбранный период.`, { parse_mode: 'Markdown' });
+    return;
+  }
+
+  const lines: string[] = [header, ''];
+
+  for (const d of r.days) {
+    const dateObj = new Date(`${d.date}T00:00:00.000Z`);
+    const dayName = DAY_NAMES[dateObj.getUTCDay()];
+    lines.push(`📅 *${formatDate(dateObj)} (${dayName})*`);
+    if (d.sickLeave) {
+      lines.push('  🏥 Больничный');
+    } else {
+      lines.push(`  🕐 ${d.workStart} – ${d.workEnd}`);
+      if (d.lunchStart && d.lunchEnd) lines.push(`  🍽 ${d.lunchStart} – ${d.lunchEnd}`);
+      lines.push(`  ⏱ ${hoursStr(d.netHours)} × ${fmtMoney(d.rate)}/ч = *${fmtMoney(d.amount)}*`);
+    }
+    lines.push('');
+  }
+
+  if (r.adjustments.length > 0) {
+    lines.push('─────────────────');
+    for (const a of r.adjustments) {
+      const dateObj = new Date(`${a.date}T00:00:00.000Z`);
+      const sign = a.type === 'BONUS' ? '➕' : '➖';
+      lines.push(`${sign} ${formatDate(dateObj)}: *${fmtMoney(a.amount)}* — ${a.reason}`);
+    }
+    lines.push('');
+  }
+
+  lines.push('─────────────────');
+  lines.push(`⏱ Отработано: *${hoursStr(r.totalWorkedHours)}*`);
+  lines.push(`💵 Заработано: ${fmtMoney(r.grossSalary)}`);
+  if (r.bonuses > 0) lines.push(`➕ Премии: ${fmtMoney(r.bonuses)}`);
+  if (r.penalties > 0) lines.push(`➖ Штрафы: ${fmtMoney(r.penalties)}`);
+  lines.push(`💰 *К выплате: ${fmtMoney(r.netSalary)}*`);
+
+  await sendPages(ctx, lines);
 }
 
 async function showEmployeeKeyboard(ctx: BotContext): Promise<void> {

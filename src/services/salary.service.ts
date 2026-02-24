@@ -1,11 +1,24 @@
 import { prisma } from '../prisma';
-import { TimeEntryType } from '@prisma/client';
+import { AdjustmentType, TimeEntryType } from '@prisma/client';
+import { formatTime } from '../utils/time';
 
 export interface DaySalary {
   date: string; // YYYY-MM-DD
   netHours: number;
   rate: number;
   amount: number;
+  sickLeave?: boolean;
+  workStart?: string;
+  workEnd?: string;
+  lunchStart?: string;
+  lunchEnd?: string;
+}
+
+export interface AdjustmentItem {
+  type: AdjustmentType;
+  amount: number;
+  date: string;
+  reason: string;
 }
 
 export interface SalaryResult {
@@ -13,6 +26,7 @@ export interface SalaryResult {
   firstName: string;
   lastName: string;
   days: DaySalary[];
+  adjustments: AdjustmentItem[];
   totalWorkedHours: number;
   grossSalary: number;
   bonuses: number;
@@ -59,7 +73,7 @@ export const salaryService = {
       const types = dayEntries.map((e) => e.type);
 
       if (types.includes(TimeEntryType.SICK_LEAVE)) {
-        days.push({ date: dateKey, netHours: 0, rate: 0, amount: 0 });
+        days.push({ date: dateKey, netHours: 0, rate: 0, amount: 0, sickLeave: true });
         continue;
       }
 
@@ -89,7 +103,16 @@ export const salaryService = {
       totalWorkedMs += ms;
       grossSalary += amount;
 
-      days.push({ date: dateKey, netHours: Math.round(netHours * 100) / 100, rate, amount: Math.round(amount * 100) / 100 });
+      days.push({
+        date: dateKey,
+        netHours: Math.round(netHours * 100) / 100,
+        rate,
+        amount: Math.round(amount * 100) / 100,
+        workStart: formatTime(workStart.timestamp),
+        workEnd: formatTime(workEnd.timestamp),
+        lunchStart: ls ? formatTime(ls.timestamp) : undefined,
+        lunchEnd: le ? formatTime(le.timestamp) : undefined,
+      });
     }
 
     // Adjustments in period
@@ -109,6 +132,12 @@ export const salaryService = {
       firstName: employee.firstName,
       lastName: employee.lastName,
       days,
+      adjustments: adjustments.map((a) => ({
+        type: a.type,
+        amount: Number(a.amount),
+        date: a.date.toISOString().slice(0, 10),
+        reason: a.reason,
+      })),
       totalWorkedHours: Math.round((totalWorkedMs / 3_600_000) * 100) / 100,
       grossSalary: Math.round(grossSalary * 100) / 100,
       bonuses: Math.round(bonuses * 100) / 100,
