@@ -49,15 +49,31 @@ export const timeEntryService = {
       if (!prevShiftOpen) {
         return ['work_start', 'sick_leave'];
       }
-      // Previous shift ongoing — fall through to continuation actions (work_start blocked)
+
+      // Cross-midnight: combine prev+today for lunch/leave state
+      const allTypes = [...prevTypes, ...types];
+      const countAll = (t: TimeEntryType) => allTypes.filter((x) => x === t).length;
+
+      const lunchOpen = countAll(TimeEntryType.LUNCH_START) > countAll(TimeEntryType.LUNCH_END);
+      const leaveOpen =
+        countAll(TimeEntryType.PERSONAL_LEAVE_START) > countAll(TimeEntryType.PERSONAL_LEAVE_END);
+
+      if (lunchOpen) return ['lunch_end'];
+      if (leaveOpen) return ['personal_leave_end'];
+
+      const actions: AvailableAction[] = [];
+      if (countAll(TimeEntryType.LUNCH_START) === 0) actions.push('lunch_start');
+      actions.push('personal_leave_start');
+      actions.push('work_end');
+      return actions;
     }
 
+    // Normal flow (today has WORK_START)
     if (has(TimeEntryType.LUNCH_START) && !has(TimeEntryType.LUNCH_END)) {
       return ['lunch_end'];
     }
 
     if (has(TimeEntryType.PERSONAL_LEAVE_START)) {
-      // count pairs to detect open personal leave
       const starts = types.filter((t) => t === TimeEntryType.PERSONAL_LEAVE_START).length;
       const ends = types.filter((t) => t === TimeEntryType.PERSONAL_LEAVE_END).length;
       if (starts > ends) return ['personal_leave_end'];

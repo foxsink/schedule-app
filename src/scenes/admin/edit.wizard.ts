@@ -91,10 +91,16 @@ async function showEntryActions(ctx: BotContext, entryId: number): Promise<void>
 async function showAddTypeMenu(
   ctx: BotContext,
   entries: Array<{ type: TimeEntryType }>,
-  prevDayShiftOpen = false,
+  prevDayEntries: Array<{ type: TimeEntryType }> = [],
 ): Promise<void> {
   const count = (t: TimeEntryType) => entries.filter((e) => e.type === t).length;
+  const prevCount = (t: TimeEntryType) => prevDayEntries.filter((e) => e.type === t).length;
+  const totalCount = (t: TimeEntryType) => count(t) + prevCount(t);
   const existingTypes = new Set(entries.map((e) => e.type));
+  const prevTypes = new Set(prevDayEntries.map((e) => e.type));
+
+  const prevDayShiftOpen =
+    prevTypes.has(TimeEntryType.WORK_START) && !prevTypes.has(TimeEntryType.WORK_END);
 
   const SINGLE_USE: TimeEntryType[] = [
     TimeEntryType.WORK_START, TimeEntryType.WORK_END,
@@ -102,9 +108,11 @@ async function showAddTypeMenu(
     TimeEntryType.SICK_LEAVE,
   ];
   const onSickLeave = existingTypes.has(TimeEntryType.SICK_LEAVE);
-  // Use counts for accuracy with multiple leave/lunch periods
-  const onLunch = count(TimeEntryType.LUNCH_START) > count(TimeEntryType.LUNCH_END);
-  const onLeave = count(TimeEntryType.PERSONAL_LEAVE_START) > count(TimeEntryType.PERSONAL_LEAVE_END);
+
+  // Combined lunch/leave state (today + prev day for cross-midnight shifts)
+  const onLunch = totalCount(TimeEntryType.LUNCH_START) > totalCount(TimeEntryType.LUNCH_END);
+  const onLeave =
+    totalCount(TimeEntryType.PERSONAL_LEAVE_START) > totalCount(TimeEntryType.PERSONAL_LEAVE_END);
 
   // Cross-midnight: treat as if shift has already started
   const effectiveWorkStarted = existingTypes.has(TimeEntryType.WORK_START) || prevDayShiftOpen;
@@ -112,12 +120,21 @@ async function showAddTypeMenu(
   const rows = Object.entries(TYPE_LABELS).map(([type, label]) => {
     const t = type as TimeEntryType;
     const noWorkStart = !effectiveWorkStarted;
-    const alreadyDone = SINGLE_USE.includes(t) && existingTypes.has(t);
+    // Cross-midnight: prev day's completed single-use types count as ✅ (except WORK_START/WORK_END)
+    const alreadyDone =
+      SINGLE_USE.includes(t) &&
+      (existingTypes.has(t) ||
+        (prevDayShiftOpen &&
+          prevTypes.has(t) &&
+          t !== TimeEntryType.WORK_START &&
+          t !== TimeEntryType.WORK_END));
     const requiresWorkStart = noWorkStart && t !== TimeEntryType.WORK_START && t !== TimeEntryType.SICK_LEAVE;
     // Block work_start if previous day's shift is still open
-    const workStartCrossMidnight = prevDayShiftOpen && t === TimeEntryType.WORK_START && !existingTypes.has(TimeEntryType.WORK_START);
+    const workStartCrossMidnight =
+      prevDayShiftOpen && t === TimeEntryType.WORK_START && !existingTypes.has(TimeEntryType.WORK_START);
     const sickLeaveBlocked = t === TimeEntryType.SICK_LEAVE && effectiveWorkStarted;
-    const lunchEndBlocked = t === TimeEntryType.LUNCH_END && !existingTypes.has(TimeEntryType.LUNCH_START);
+    // Use combined onLunch/onLeave for accurate cross-midnight blocking
+    const lunchEndBlocked = t === TimeEntryType.LUNCH_END && !onLunch;
     const returnBlocked = t === TimeEntryType.PERSONAL_LEAVE_END && !onLeave;
     const onLunchBlocked = onLunch && t !== TimeEntryType.LUNCH_END;
     const onLeaveBlocked = onLeave && t !== TimeEntryType.PERSONAL_LEAVE_END;
@@ -337,14 +354,11 @@ adminEditWizard.action('edit_add', async (ctx) => {
   const date = new Date(`${dateStr}T00:00:00.000Z`);
   const entries = await timeEntryService.getEntriesByDate(empId, date);
 
-  // Check if previous day has an open shift (cross-midnight)
+  // Fetch previous day entries for cross-midnight lunch/leave state detection
   const prevDate = new Date(date.getTime() - 86_400_000);
   const prevEntries = await prisma.timeEntry.findMany({ where: { employeeId: empId, date: prevDate } });
-  const prevTypes = prevEntries.map((e) => e.type);
-  const prevDayShiftOpen =
-    prevTypes.includes(TimeEntryType.WORK_START) && !prevTypes.includes(TimeEntryType.WORK_END);
 
-  await showAddTypeMenu(ctx, entries, prevDayShiftOpen);
+  await showAddTypeMenu(ctx, entries, prevEntries);
 });
 
 // Add entry — type selected
