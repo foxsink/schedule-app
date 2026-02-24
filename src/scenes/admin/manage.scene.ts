@@ -61,6 +61,7 @@ async function showEmployeeCard(ctx: BotContext, employeeId: number): Promise<vo
     rows.push([Markup.button.callback('✅ Активировать', `mgmt_activate_${employeeId}`)]);
   }
   rows.push([Markup.button.callback('🔑 Новый код приглашения', `mgmt_newcode_${employeeId}`)]);
+  rows.push([Markup.button.callback('🗑 Удалить сотрудника', `mgmt_delete_${employeeId}`)]);
   rows.push([Markup.button.callback('« К списку', 'mgmt_list')]);
 
   await ctx.reply(lines.join('\n'), { parse_mode: 'Markdown', ...Markup.inlineKeyboard(rows) });
@@ -185,6 +186,47 @@ adminManageScene.action(/^mgmt_newcode_(\d+)$/, async (ctx) => {
   const code = await employeeService.generateInvitationCode();
   await prisma.employee.update({ where: { id: empId }, data: { invitationCode: code } });
   await ctx.reply(`🔑 Новый код приглашения: \`${code}\``, { parse_mode: 'Markdown' });
+});
+
+adminManageScene.action(/^mgmt_delete_(\d+)$/, async (ctx) => {
+  await ctx.answerCbQuery();
+  const empId = parseInt(ctx.match[1], 10);
+  const emp = await prisma.employee.findUnique({ where: { id: empId } });
+  if (!emp) { await ctx.reply('Сотрудник не найден.'); return; }
+
+  await ctx.reply(
+    `⚠️ Вы уверены, что хотите удалить сотрудника?\n\n*${emp.lastName} ${emp.firstName}*\n\nСотрудник будет деактивирован и скрыт из системы.`,
+    {
+      parse_mode: 'Markdown',
+      ...Markup.inlineKeyboard([
+        [Markup.button.callback('🗑 Да, удалить', `mgmt_confirm_delete_${empId}`)],
+        [Markup.button.callback('✗ Отмена', `mgmt_emp_${empId}`)],
+      ]),
+    },
+  );
+});
+
+adminManageScene.action(/^mgmt_confirm_delete_(\d+)$/, async (ctx) => {
+  await ctx.answerCbQuery();
+  const empId = parseInt(ctx.match[1], 10);
+  const editorId = ctx.employee?.id;
+  if (!editorId) return ctx.scene.leave();
+
+  const emp = await prisma.employee.findUnique({ where: { id: empId } });
+  if (!emp) { await ctx.reply('Сотрудник не найден.'); return; }
+
+  await prisma.employee.update({ where: { id: empId }, data: { isActive: false } });
+  await auditService.log(
+    editorId,
+    AuditAction.DELETE,
+    AuditEntityType.EMPLOYEE,
+    empId,
+    { isActive: emp.isActive },
+    { isActive: false },
+  );
+
+  await ctx.reply(`🗑 Сотрудник *${emp.lastName} ${emp.firstName}* удалён.`, { parse_mode: 'Markdown' });
+  await showEmployeeList(ctx);
 });
 
 adminManageScene.action('mgmt_list', async (ctx) => {
