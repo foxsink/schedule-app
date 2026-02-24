@@ -249,10 +249,24 @@ adminEditWizard.action('edit_add', async (ctx) => {
   await showAddTypeMenu(ctx, existingTypes);
 });
 
-// Add entry — type selected, ask for time
+// Add entry — type selected
 adminEditWizard.action(/^edit_add_type_(.+)$/, async (ctx) => {
   await ctx.answerCbQuery();
   const type = ctx.match[1] as TimeEntryType;
+  const editorId = ctx.employee?.id;
+  const empId = ctx.scene.session.selectedEmployeeId;
+  const dateStr = ctx.scene.session.selectedPeriodFrom;
+  if (!editorId || !empId || !dateStr) return ctx.scene.leave();
+
+  // Sick leave has no time — record immediately at start of day
+  if (type === TimeEntryType.SICK_LEAVE) {
+    const date = new Date(`${dateStr}T00:00:00.000Z`);
+    await timeEntryService.createEntryManual(editorId, empId, type, date, date);
+    await ctx.reply(`✅ Запись добавлена: ${TYPE_LABELS[type]}`);
+    await showEntriesList(ctx, empId, date);
+    return;
+  }
+
   ctx.scene.session.selectedDate = `add:${type}`;
   while (ctx.wizard.cursor < 2) ctx.wizard.next();
   await ctx.reply(`Введите время для "${TYPE_LABELS[type]}" в формате ЧЧ:ММ:`);
