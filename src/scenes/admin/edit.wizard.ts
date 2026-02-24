@@ -93,10 +93,12 @@ async function showAddTypeMenu(ctx: BotContext, existingTypes: Set<TimeEntryType
   const onSickLeave = existingTypes.has(TimeEntryType.SICK_LEAVE);
   const rows = Object.entries(TYPE_LABELS).map(([type, label]) => {
     const t = type as TimeEntryType;
+    const noWorkStart = !existingTypes.has(TimeEntryType.WORK_START);
+    const requiresWorkStart = noWorkStart && t !== TimeEntryType.WORK_START && t !== TimeEntryType.SICK_LEAVE;
     const sickLeaveBlocked = t === TimeEntryType.SICK_LEAVE && existingTypes.has(TimeEntryType.WORK_START);
     const lunchEndBlocked = t === TimeEntryType.LUNCH_END && !existingTypes.has(TimeEntryType.LUNCH_START);
     const returnBlocked = t === TimeEntryType.PERSONAL_LEAVE_END && !existingTypes.has(TimeEntryType.PERSONAL_LEAVE_START);
-    const inactive = onSickLeave || sickLeaveBlocked || lunchEndBlocked || returnBlocked || (SINGLE_USE.includes(t) && existingTypes.has(t));
+    const inactive = onSickLeave || requiresWorkStart || sickLeaveBlocked || lunchEndBlocked || returnBlocked || (SINGLE_USE.includes(t) && existingTypes.has(t));
     return [
       inactive
         ? Markup.button.callback(`✓ ${label}`, 'noop')
