@@ -43,6 +43,6 @@ employeeMenuScene.enter(showMenu);
 
 employeeMenuScene.action('switch_to_admin', async (ctx) => {
   await ctx.answerCbQuery();
-  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [] }); } catch {}
+  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [[{ text: '📋 Меню', callback_data: 'go_menu' }]] }); } catch {}
   return ctx.scene.enter(ADMIN_MENU_SCENE_ID);
 });

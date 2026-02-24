@@ -130,14 +130,14 @@ adminReportWizard.action('rpt_emp_all', async (ctx) => {
 
 adminReportWizard.action('rpt_emp_back', async (ctx) => {
   await ctx.answerCbQuery();
-  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [] }); } catch {}
+  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [[{ text: '📋 Меню', callback_data: 'go_menu' }]] }); } catch {}
   return ctx.scene.enter(ADMIN_MENU_SCENE_ID);
 });
 
 // Period actions
 adminReportWizard.action('rpt_today', async (ctx) => {
   await ctx.answerCbQuery();
-  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [] }); } catch {}
+  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [[{ text: '📋 Меню', callback_data: 'go_menu' }]] }); } catch {}
   const today = todayDateUTC7();
   await showReport(ctx, today, today);
   return ctx.scene.enter(ADMIN_MENU_SCENE_ID);
@@ -145,7 +145,7 @@ adminReportWizard.action('rpt_today', async (ctx) => {
 
 adminReportWizard.action('rpt_week', async (ctx) => {
   await ctx.answerCbQuery();
-  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [] }); } catch {}
+  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [[{ text: '📋 Меню', callback_data: 'go_menu' }]] }); } catch {}
   const now = nowUTC7();
   const diff = (now.getUTCDay() + 6) % 7;
   const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) - diff * 86_400_000);
@@ -155,7 +155,7 @@ adminReportWizard.action('rpt_week', async (ctx) => {
 
 adminReportWizard.action('rpt_month', async (ctx) => {
   await ctx.answerCbQuery();
-  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [] }); } catch {}
+  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [[{ text: '📋 Меню', callback_data: 'go_menu' }]] }); } catch {}
   const now = nowUTC7();
   const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
   await showReport(ctx, from, todayDateUTC7());
@@ -170,6 +170,6 @@ adminReportWizard.action('rpt_custom', async (ctx) => {
 
 adminReportWizard.action('rpt_back', async (ctx) => {
   await ctx.answerCbQuery();
-  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [] }); } catch {}
+  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [[{ text: '📋 Меню', callback_data: 'go_menu' }]] }); } catch {}
   return ctx.scene.enter(ADMIN_MENU_SCENE_ID);
 });
