@@ -73,6 +73,7 @@ export function registerEmployeeActions(bot: Telegraf<BotContext>) {
 
   bot.action('my_schedule', async (ctx) => {
     await ctx.answerCbQuery();
+    try { await ctx.editMessageReplyMarkup({ inline_keyboard: [] }); } catch {}
     return ctx.scene.enter(HISTORY_SCENE_ID);
   });
 }

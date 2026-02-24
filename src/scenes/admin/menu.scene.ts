@@ -31,40 +31,48 @@ adminMenuScene.enter(async (ctx) => {
 
 adminMenuScene.action('admin_schedule', async (ctx) => {
   await ctx.answerCbQuery();
+  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [] }); } catch {}
   return ctx.scene.enter('admin_schedule');
 });
 
 adminMenuScene.action('admin_reports', async (ctx) => {
   await ctx.answerCbQuery();
+  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [] }); } catch {}
   return ctx.scene.enter('admin_report');
 });
 
 adminMenuScene.action('admin_edit', async (ctx) => {
   await ctx.answerCbQuery();
+  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [] }); } catch {}
   return ctx.scene.enter('admin_edit');
 });
 
 adminMenuScene.action('admin_employees', async (ctx) => {
   await ctx.answerCbQuery();
+  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [] }); } catch {}
   return ctx.scene.enter('admin_manage');
 });
 
 adminMenuScene.action('admin_salaries', async (ctx) => {
   await ctx.answerCbQuery();
+  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [] }); } catch {}
   return ctx.scene.enter('admin_salary');
 });
 
 adminMenuScene.action('admin_export', async (ctx) => {
   await ctx.answerCbQuery();
+  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [] }); } catch {}
   return ctx.scene.enter('admin_export');
 });
 
 adminMenuScene.action('admin_audit', async (ctx) => {
   await ctx.answerCbQuery();
+  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [] }); } catch {}
   return ctx.scene.enter('admin_audit');
 });
 
 adminMenuScene.action('admin_to_employee', async (ctx) => {
   await ctx.answerCbQuery();
+  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [] }); } catch {}
   return ctx.scene.enter('employee_menu');
 });

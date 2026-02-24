@@ -63,6 +63,7 @@ adminExportWizard.enter(async (ctx) => {
 
 adminExportWizard.action('exp_week', async (ctx) => {
   await ctx.answerCbQuery();
+  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [] }); } catch {}
   const now = nowUTC7();
   const diff = (now.getUTCDay() + 6) % 7;
   const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) - diff * 86_400_000);
@@ -72,6 +73,7 @@ adminExportWizard.action('exp_week', async (ctx) => {
 
 adminExportWizard.action('exp_month', async (ctx) => {
   await ctx.answerCbQuery();
+  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [] }); } catch {}
   const now = nowUTC7();
   const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
   await sendExcel(ctx, from, todayDateUTC7());
@@ -86,5 +88,6 @@ adminExportWizard.action('exp_custom', async (ctx) => {
 
 adminExportWizard.action('exp_back', async (ctx) => {
   await ctx.answerCbQuery();
+  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [] }); } catch {}
   return ctx.scene.enter(ADMIN_MENU_SCENE_ID);
 });

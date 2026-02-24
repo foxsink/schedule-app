@@ -183,6 +183,7 @@ export const historyScene = new Scenes.WizardScene<BotContext>(
 
 historyScene.action('hist_today', async (ctx) => {
   await ctx.answerCbQuery();
+  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [] }); } catch {}
   if (!ctx.employee) return ctx.scene.leave();
   const today = todayDateUTC7();
   await showHistory(ctx, today, today);
@@ -191,6 +192,7 @@ historyScene.action('hist_today', async (ctx) => {
 
 historyScene.action('hist_week', async (ctx) => {
   await ctx.answerCbQuery();
+  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [] }); } catch {}
   if (!ctx.employee) return ctx.scene.leave();
   const now = nowUTC7();
   const dayOfWeek = now.getUTCDay();
@@ -206,6 +208,7 @@ historyScene.action('hist_week', async (ctx) => {
 
 historyScene.action('hist_month', async (ctx) => {
   await ctx.answerCbQuery();
+  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [] }); } catch {}
   if (!ctx.employee) return ctx.scene.leave();
   const now = nowUTC7();
   const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
@@ -222,5 +225,6 @@ historyScene.action('hist_custom', async (ctx) => {
 
 historyScene.action('hist_back', async (ctx) => {
   await ctx.answerCbQuery();
+  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [] }); } catch {}
   return ctx.scene.enter('employee_menu');
 });

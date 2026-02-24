@@ -111,5 +111,6 @@ adminAuditScene.action(/^audit_page_(\d+)$/, async (ctx) => {
 
 adminAuditScene.action('audit_back', async (ctx) => {
   await ctx.answerCbQuery();
+  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [] }); } catch {}
   return ctx.scene.enter(ADMIN_MENU_SCENE_ID);
 });

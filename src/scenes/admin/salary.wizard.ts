@@ -165,6 +165,7 @@ adminSalaryWizard.action('sal_emp_all', async (ctx) => {
 
 adminSalaryWizard.action('sal_today', async (ctx) => {
   await ctx.answerCbQuery();
+  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [] }); } catch {}
   const today = todayDateUTC7();
   await showSalaryForPeriod(ctx, today, today);
   ctx.wizard.selectStep(0);
@@ -172,6 +173,7 @@ adminSalaryWizard.action('sal_today', async (ctx) => {
 
 adminSalaryWizard.action('sal_week', async (ctx) => {
   await ctx.answerCbQuery();
+  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [] }); } catch {}
   const now = nowUTC7();
   const diff = (now.getUTCDay() + 6) % 7;
   const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) - diff * 86_400_000);
@@ -181,6 +183,7 @@ adminSalaryWizard.action('sal_week', async (ctx) => {
 
 adminSalaryWizard.action('sal_month', async (ctx) => {
   await ctx.answerCbQuery();
+  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [] }); } catch {}
   const now = nowUTC7();
   const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
   await showSalaryForPeriod(ctx, from, todayDateUTC7());
@@ -211,5 +214,6 @@ adminSalaryWizard.action(/^sal_penalty_(\d+)$/, async (ctx) => {
 
 adminSalaryWizard.action('sal_back', async (ctx) => {
   await ctx.answerCbQuery();
+  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [] }); } catch {}
   return ctx.scene.enter(ADMIN_MENU_SCENE_ID);
 });

@@ -52,5 +52,6 @@ adminScheduleScene.action('sched_refresh', async (ctx) => {
 
 adminScheduleScene.action('sched_back', async (ctx) => {
   await ctx.answerCbQuery();
+  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [] }); } catch {}
   return ctx.scene.enter(ADMIN_MENU_SCENE_ID);
 });
