@@ -177,22 +177,23 @@ export const historyScene = new Scenes.WizardScene<BotContext>(
       return;
     }
     await showHistory(ctx, from, to);
-    return ctx.scene.leave();
+    ctx.wizard.selectStep(0);
+    await ctx.reply('Выберите период:', PERIOD_KEYBOARD);
   }
 );
 
 historyScene.action('hist_today', async (ctx) => {
   await ctx.answerCbQuery();
-  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [[{ text: '📋 Меню', callback_data: 'go_menu' }]] }); } catch {}
+  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [[{ text: '✓ Сегодня', callback_data: 'noop' }]] }); } catch {}
   if (!ctx.employee) return ctx.scene.leave();
   const today = todayDateUTC7();
   await showHistory(ctx, today, today);
-  return ctx.scene.leave();
+  await ctx.reply('Выберите период:', PERIOD_KEYBOARD);
 });
 
 historyScene.action('hist_week', async (ctx) => {
   await ctx.answerCbQuery();
-  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [[{ text: '📋 Меню', callback_data: 'go_menu' }]] }); } catch {}
+  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [[{ text: '✓ Эта неделя', callback_data: 'noop' }]] }); } catch {}
   if (!ctx.employee) return ctx.scene.leave();
   const now = nowUTC7();
   const dayOfWeek = now.getUTCDay();
@@ -203,18 +204,18 @@ historyScene.action('hist_week', async (ctx) => {
   const from = new Date(mondayMs);
   const to = todayDateUTC7();
   await showHistory(ctx, from, to);
-  return ctx.scene.leave();
+  await ctx.reply('Выберите период:', PERIOD_KEYBOARD);
 });
 
 historyScene.action('hist_month', async (ctx) => {
   await ctx.answerCbQuery();
-  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [[{ text: '📋 Меню', callback_data: 'go_menu' }]] }); } catch {}
+  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [[{ text: '✓ Этот месяц', callback_data: 'noop' }]] }); } catch {}
   if (!ctx.employee) return ctx.scene.leave();
   const now = nowUTC7();
   const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
   const to = todayDateUTC7();
   await showHistory(ctx, from, to);
-  return ctx.scene.leave();
+  await ctx.reply('Выберите период:', PERIOD_KEYBOARD);
 });
 
 historyScene.action('hist_custom', async (ctx) => {
