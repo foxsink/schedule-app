@@ -84,12 +84,19 @@ async function showEntryActions(ctx: BotContext, entryId: number): Promise<void>
   );
 }
 
-async function showAddTypeMenu(ctx: BotContext): Promise<void> {
-  const types = Object.entries(TYPE_LABELS).map(([type, label]) => [
-    Markup.button.callback(label, `edit_add_type_${type}`),
-  ]);
+async function showAddTypeMenu(ctx: BotContext, existingTypes: Set<TimeEntryType>): Promise<void> {
+  const INACTIVE: TimeEntryType[] = [TimeEntryType.LUNCH_START, TimeEntryType.LUNCH_END];
+  const rows = Object.entries(TYPE_LABELS).map(([type, label]) => {
+    const t = type as TimeEntryType;
+    const inactive = INACTIVE.includes(t) && existingTypes.has(t);
+    return [
+      inactive
+        ? Markup.button.callback(`✓ ${label}`, 'noop')
+        : Markup.button.callback(label, `edit_add_type_${type}`),
+    ];
+  });
   const keyboard = Markup.inlineKeyboard([
-    ...types,
+    ...rows,
     [Markup.button.callback('« Назад', 'edit_back_to_list')],
   ]);
   await ctx.reply('Выберите тип записи:', keyboard);
@@ -220,7 +227,13 @@ adminEditWizard.action(/^edit_delete_(\d+)$/, async (ctx) => {
 // Add entry — show type menu
 adminEditWizard.action('edit_add', async (ctx) => {
   await ctx.answerCbQuery();
-  await showAddTypeMenu(ctx);
+  const empId = ctx.scene.session.selectedEmployeeId;
+  const dateStr = ctx.scene.session.selectedPeriodFrom;
+  if (!empId || !dateStr) return;
+  const date = new Date(`${dateStr}T00:00:00.000Z`);
+  const entries = await timeEntryService.getEntriesByDate(empId, date);
+  const existingTypes = new Set(entries.map((e) => e.type));
+  await showAddTypeMenu(ctx, existingTypes);
 });
 
 // Add entry — type selected, ask for time
