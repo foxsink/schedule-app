@@ -1,0 +1,118 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  EMPLOYEE
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum TimeEntryType {
+  WORK_START
+  WORK_END
+  LUNCH_START
+  LUNCH_END
+  PERSONAL_LEAVE_START
+  PERSONAL_LEAVE_END
+  SICK_LEAVE
+}
+
+enum AdjustmentType {
+  BONUS
+  PENALTY
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+}
+
+enum AuditEntityType {
+  TIME_ENTRY
+  SALARY_ADJUSTMENT
+  EMPLOYEE
+  EMPLOYEE_RATE
+}
+
+model Employee {
+  id             Int       @id @default(autoincrement())
+  telegramId     BigInt?   @unique
+  firstName      String
+  lastName       String
+  role           Role      @default(EMPLOYEE)
+  invitationCode String?   @unique
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  timeEntries        TimeEntry[]
+  rates              EmployeeRate[]
+  salaryAdjustments  SalaryAdjustment[]
+  auditLogs          AuditLog[]          @relation("editor")
+}
+
+model EmployeeRate {
+  id            Int      @id @default(autoincrement())
+  employeeId    Int
+  rate          Decimal  @db.Decimal(10, 2)
+  effectiveFrom DateTime @db.Date
+  createdAt     DateTime @default(now())
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId, effectiveFrom])
+}
+
+model TimeEntry {
+  id         Int           @id @default(autoincrement())
+  employeeId Int
+  type       TimeEntryType
+  timestamp  DateTime
+  date       DateTime      @db.Date
+  note       String?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId, date])
+  @@index([date])
+}
+
+model SalaryAdjustment {
+  id         Int            @id @default(autoincrement())
+  employeeId Int
+  amount     Decimal        @db.Decimal(10, 2)
+  type       AdjustmentType
+  date       DateTime       @db.Date
+  reason     String
+  createdAt  DateTime       @default(now())
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId, date])
+}
+
+model AuditLog {
+  id           Int             @id @default(autoincrement())
+  editorId     Int
+  action       AuditAction
+  entityType   AuditEntityType
+  entityId     Int
+  previousData Json?
+  newData      Json?
+  createdAt    DateTime        @default(now())
+
+  editor Employee @relation("editor", fields: [editorId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([editorId])
+  @@index([createdAt])
+}
