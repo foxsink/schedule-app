@@ -210,6 +210,10 @@ adminManageScene.action(/^mgmt_role_employee_(\d+)$/, async (ctx) => {
   const empId = parseInt(ctx.match[1], 10);
   const editorId = ctx.employee?.id;
   if (!editorId) return ctx.scene.leave();
+  if (empId === editorId) {
+    await ctx.reply('⚠️ Нельзя снять права администратора с самого себя.');
+    return;
+  }
   await prisma.employee.update({ where: { id: empId }, data: { role: 'EMPLOYEE' } });
   await auditService.log(editorId, AuditAction.UPDATE, AuditEntityType.EMPLOYEE, empId, { role: 'ADMIN' }, { role: 'EMPLOYEE' });
   await ctx.reply('👤 Права администратора сняты.');
