@@ -65,15 +65,17 @@ export const excelService = {
     const detailSheet = workbook.addWorksheet('Детализация');
 
     detailSheet.columns = [
-      { header: 'Дата',       key: 'date',       width: 14 },
-      { header: 'Сотрудник',  key: 'name',       width: 25 },
-      { header: 'Начало',     key: 'start',      width: 10 },
-      { header: 'Конец',      key: 'end',        width: 10 },
-      { header: 'Обед (ч)',   key: 'lunch',      width: 10 },
-      { header: 'Отлучки (ч)',key: 'leaves',     width: 12 },
-      { header: 'Часы',       key: 'hours',      width: 8  },
-      { header: 'Ставка',     key: 'rate',       width: 10 },
-      { header: 'Сумма',      key: 'amount',     width: 12 },
+      { header: 'Дата',        key: 'date',       width: 14 },
+      { header: 'Сотрудник',   key: 'name',       width: 25 },
+      { header: 'Начало',      key: 'start',      width: 10 },
+      { header: 'Конец',       key: 'end',        width: 10 },
+      { header: 'Обед (ч)',    key: 'lunch',      width: 10 },
+      { header: 'Отлучки (ч)', key: 'leaves',     width: 12 },
+      { header: 'Часы',        key: 'hours',      width: 8  },
+      { header: 'Ставка',      key: 'rate',       width: 10 },
+      { header: 'Сумма',       key: 'amount',     width: 12 },
+      { header: 'Премии',      key: 'bonuses',    width: 12 },
+      { header: 'Штрафы',      key: 'penalties',  width: 12 },
     ];
 
     const detailHeaderRow = detailSheet.getRow(1);
@@ -81,8 +83,16 @@ export const excelService = {
     detailHeaderRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } };
 
     for (const result of results) {
+      // Index adjustments by date for fast lookup
+      const adjByDate = new Map<string, { bonuses: number; penalties: number }>();
+      for (const a of result.adjustments) {
+        if (!adjByDate.has(a.date)) adjByDate.set(a.date, { bonuses: 0, penalties: 0 });
+        const entry = adjByDate.get(a.date)!;
+        if (a.type === 'BONUS') entry.bonuses += a.amount;
+        else entry.penalties += a.amount;
+      }
+
       for (const day of result.days) {
-        // Fetch raw entries for lunch/leave detail
         const date = new Date(`${day.date}T00:00:00.000Z`);
         const entries = await prisma.timeEntry.findMany({
           where: { employeeId: result.employeeId, date },
@@ -104,18 +114,59 @@ export const excelService = {
         }
 
         const isSick = entries.some((e) => e.type === TimeEntryType.SICK_LEAVE);
+        const dayAdj = adjByDate.get(day.date);
 
         detailSheet.addRow({
-          date:   formatDate(date),
-          name:   `${result.lastName} ${result.firstName}`,
-          start:  workStart ? formatTime(workStart.timestamp) : (isSick ? 'Больничный' : '—'),
-          end:    workEnd   ? formatTime(workEnd.timestamp)   : '—',
-          lunch:  Math.round((lunchMs  / 3_600_000) * 100) / 100 || '',
-          leaves: Math.round((leavesMs / 3_600_000) * 100) / 100 || '',
-          hours:  day.netHours || '',
-          rate:   day.rate     || '',
-          amount: day.amount   || '',
+          date:      formatDate(date),
+          name:      `${result.lastName} ${result.firstName}`,
+          start:     workStart ? formatTime(workStart.timestamp) : (isSick ? 'Больничный' : '—'),
+          end:       workEnd   ? formatTime(workEnd.timestamp)   : '—',
+          lunch:     Math.round((lunchMs  / 3_600_000) * 100) / 100 || '',
+          leaves:    Math.round((leavesMs / 3_600_000) * 100) / 100 || '',
+          hours:     day.netHours || '',
+          rate:      day.rate     || '',
+          amount:    day.amount   || '',
+          bonuses:   dayAdj?.bonuses   || '',
+          penalties: dayAdj?.penalties || '',
         });
+      }
+    }
+
+    // ── Sheet 3: Корректировки ─────────────────────────────────────────────────
+    const adjSheet = workbook.addWorksheet('Корректировки');
+
+    adjSheet.columns = [
+      { header: 'Дата',       key: 'date',    width: 14 },
+      { header: 'Сотрудник',  key: 'name',    width: 25 },
+      { header: 'Тип',        key: 'type',    width: 12 },
+      { header: 'Сумма',      key: 'amount',  width: 12 },
+      { header: 'Описание',   key: 'reason',  width: 40 },
+    ];
+
+    const adjHeaderRow = adjSheet.getRow(1);
+    adjHeaderRow.font = { bold: true };
+    adjHeaderRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } };
+
+    for (const result of results) {
+      for (const a of result.adjustments) {
+        const dateObj = new Date(`${a.date}T00:00:00.000Z`);
+        const row = adjSheet.addRow({
+          date:   formatDate(dateObj),
+          name:   `${result.lastName} ${result.firstName}`,
+          type:   a.type === 'BONUS' ? 'Премия' : 'Штраф',
+          amount: a.amount,
+          reason: a.reason,
+        });
+        // Highlight bonuses green, penalties red
+        const typeCell = row.getCell('type');
+        const amountCell = row.getCell('amount');
+        if (a.type === 'BONUS') {
+          typeCell.font = { color: { argb: 'FF2E7D32' } };
+          amountCell.font = { color: { argb: 'FF2E7D32' } };
+        } else {
+          typeCell.font = { color: { argb: 'FFC62828' } };
+          amountCell.font = { color: { argb: 'FFC62828' } };
+        }
       }
     }
 
