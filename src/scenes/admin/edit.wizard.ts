@@ -3,7 +3,7 @@ import { BotContext } from '../../types/context';
 import { prisma } from '../../prisma';
 import { timeEntryService } from '../../services/timeEntry.service';
 import { parseTime, parseDate } from '../../utils/validation';
-import { formatDate, formatTime, localInputToUtc, todayDateUTC7 } from '../../utils/time';
+import { formatDate, formatTime, localInputToUtc, nowUTC7, todayDateUTC7 } from '../../utils/time';
 import { TimeEntryType } from '@prisma/client';
 import { ADMIN_MENU_SCENE_ID } from './menu.scene';
 
@@ -246,7 +246,10 @@ adminEditWizard.action(/^edit_change_(\d+)$/, async (ctx) => {
   ctx.scene.session.selectedDate = `eid:${entryId}`;
   // ensure cursor is at step 2
   while (ctx.wizard.cursor < 2) ctx.wizard.next();
-  await ctx.reply('Введите новое время в формате ЧЧ:ММ (например, 09:30):');
+  await ctx.reply(
+    'Введите новое время в формате ЧЧ:ММ или выберите:',
+    Markup.inlineKeyboard([[Markup.button.callback(`🕐 Сейчас (${formatTime(nowUTC7())})`, 'edit_time_now')]]),
+  );
 });
 
 // Delete entry
@@ -310,6 +313,7 @@ adminEditWizard.action(/^edit_add_type_(.+)$/, async (ctx) => {
             Markup.button.callback(`+30 мин (${formatTime(t30)})`, 'edit_lunch_end_30'),
             Markup.button.callback(`+1 час (${formatTime(t60)})`, 'edit_lunch_end_60'),
           ],
+          [Markup.button.callback(`🕐 Сейчас (${formatTime(nowUTC7())})`, 'edit_time_now')],
         ]),
       );
       return;
@@ -318,7 +322,10 @@ adminEditWizard.action(/^edit_add_type_(.+)$/, async (ctx) => {
 
   ctx.scene.session.selectedDate = `add:${type}`;
   while (ctx.wizard.cursor < 2) ctx.wizard.next();
-  await ctx.reply(`Введите время для "${TYPE_LABELS[type]}" в формате ЧЧ:ММ:`);
+  await ctx.reply(
+    `Введите время для "${TYPE_LABELS[type]}" в формате ЧЧ:ММ или выберите:`,
+    Markup.inlineKeyboard([[Markup.button.callback(`🕐 Сейчас (${formatTime(nowUTC7())})`, 'edit_time_now')]]),
+  );
 });
 
 adminEditWizard.action(/^edit_lunch_end_(30|60)$/, async (ctx) => {
@@ -337,6 +344,32 @@ adminEditWizard.action(/^edit_lunch_end_(30|60)$/, async (ctx) => {
   ctx.scene.session.selectedDate = undefined;
   ctx.wizard.selectStep(2);
   await ctx.reply(`✅ Запись добавлена: ${TYPE_LABELS[TimeEntryType.LUNCH_END]} в ${formatTime(timestamp)}`);
+  await showEntriesList(ctx, empId, date);
+});
+
+adminEditWizard.action('edit_time_now', async (ctx) => {
+  await ctx.answerCbQuery();
+  const editorId = ctx.employee?.id;
+  const empId = ctx.scene.session.selectedEmployeeId;
+  const dateStr = ctx.scene.session.selectedPeriodFrom;
+  const meta = ctx.scene.session.selectedDate;
+  if (!editorId || !empId || !dateStr || !meta) return ctx.scene.leave();
+
+  const timestamp = new Date(); // actual UTC for storage
+  const date = new Date(`${dateStr}T00:00:00.000Z`);
+
+  if (meta.startsWith('eid:')) {
+    const entryId = parseInt(meta.slice(4), 10);
+    await timeEntryService.updateEntry(editorId, entryId, timestamp);
+    await ctx.reply(`✅ Время обновлено на ${formatTime(timestamp)}`);
+  } else if (meta.startsWith('add:')) {
+    const type = meta.slice(4) as TimeEntryType;
+    await timeEntryService.createEntryManual(editorId, empId, type, timestamp, date);
+    await ctx.reply(`✅ Запись добавлена: ${TYPE_LABELS[type]} в ${formatTime(timestamp)}`);
+  }
+
+  ctx.scene.session.selectedDate = undefined;
+  ctx.wizard.selectStep(2);
   await showEntriesList(ctx, empId, date);
 });
 
