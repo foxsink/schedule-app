@@ -2,8 +2,13 @@ import { Scenes } from 'telegraf';
 import { BotContext } from '../types/context';
 import { employeeService } from '../services/employee.service';
 import { EMPLOYEE_MENU_SCENE_ID } from './employee/menu.scene';
+import { ADMIN_MENU_SCENE_ID } from './admin/menu.scene';
 
 export const START_SCENE_ID = 'start';
+
+function getMenuSceneId(role: string): string {
+  return role === 'ADMIN' || role === 'SUPER_ADMIN' ? ADMIN_MENU_SCENE_ID : EMPLOYEE_MENU_SCENE_ID;
+}
 
 export const startScene = new Scenes.WizardScene<BotContext>(
   START_SCENE_ID,
@@ -12,7 +17,7 @@ export const startScene = new Scenes.WizardScene<BotContext>(
   async (ctx) => {
     if (ctx.employee) {
       await ctx.reply(`С возвращением, ${ctx.employee.firstName}!`);
-      return ctx.scene.enter(EMPLOYEE_MENU_SCENE_ID);
+      return ctx.scene.enter(getMenuSceneId(ctx.employee.role));
     }
     await ctx.reply('Добро пожаловать! Введите код приглашения:');
     return ctx.wizard.next();
