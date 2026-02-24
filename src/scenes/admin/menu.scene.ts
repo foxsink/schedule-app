@@ -20,6 +20,7 @@ adminMenuScene.enter(async (ctx) => {
     [Markup.button.callback('Сотрудники', 'admin_employees')],
     [Markup.button.callback('Зарплаты', 'admin_salaries')],
     [Markup.button.callback('Экспорт', 'admin_export')],
+    [Markup.button.callback('👤 Режим сотрудника', 'admin_to_employee')],
   ];
   if (isSuperAdmin) {
     rows.push([Markup.button.callback('Аудит', 'admin_audit')]);
@@ -61,4 +62,9 @@ adminMenuScene.action('admin_export', async (ctx) => {
 adminMenuScene.action('admin_audit', async (ctx) => {
   await ctx.answerCbQuery();
   return ctx.scene.enter('admin_audit');
+});
+
+adminMenuScene.action('admin_to_employee', async (ctx) => {
+  await ctx.answerCbQuery();
+  return ctx.scene.enter('employee_menu');
 });
