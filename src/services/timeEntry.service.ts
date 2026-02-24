@@ -39,7 +39,17 @@ export const timeEntryService = {
     if (has(TimeEntryType.WORK_END)) return [];
 
     if (!has(TimeEntryType.WORK_START)) {
-      return ['work_start', 'sick_leave'];
+      // Check if previous day's shift is still open (cross-midnight)
+      const yesterday = new Date(todayDateUTC7().getTime() - 86_400_000);
+      const prevEntries = await prisma.timeEntry.findMany({ where: { employeeId, date: yesterday } });
+      const prevTypes = prevEntries.map((e) => e.type);
+      const prevShiftOpen =
+        prevTypes.includes(TimeEntryType.WORK_START) && !prevTypes.includes(TimeEntryType.WORK_END);
+
+      if (!prevShiftOpen) {
+        return ['work_start', 'sick_leave'];
+      }
+      // Previous shift ongoing — fall through to continuation actions (work_start blocked)
     }
 
     if (has(TimeEntryType.LUNCH_START) && !has(TimeEntryType.LUNCH_END)) {
