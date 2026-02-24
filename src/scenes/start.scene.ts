@@ -1,6 +1,7 @@
 import { Scenes } from 'telegraf';
 import { BotContext } from '../types/context';
 import { employeeService } from '../services/employee.service';
+import { EMPLOYEE_MENU_SCENE_ID } from './employee/menu.scene';
 
 export const START_SCENE_ID = 'start';
 
@@ -11,8 +12,7 @@ export const startScene = new Scenes.WizardScene<BotContext>(
   async (ctx) => {
     if (ctx.employee) {
       await ctx.reply(`С возвращением, ${ctx.employee.firstName}!`);
-      // TODO Phase 9: navigate to main menu
-      return ctx.scene.leave();
+      return ctx.scene.enter(EMPLOYEE_MENU_SCENE_ID);
     }
     await ctx.reply('Добро пожаловать! Введите код приглашения:');
     return ctx.wizard.next();
@@ -45,7 +45,6 @@ export const startScene = new Scenes.WizardScene<BotContext>(
 
     await employeeService.linkTelegram(employee.id, BigInt(ctx.from.id));
     await ctx.reply(`Добро пожаловать, ${employee.firstName} ${employee.lastName}! Вы успешно авторизованы.`);
-    // TODO Phase 9: navigate to main menu
-    return ctx.scene.leave();
+    return ctx.scene.enter(EMPLOYEE_MENU_SCENE_ID);
   }
 );
