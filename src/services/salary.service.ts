@@ -110,7 +110,7 @@ export const salaryService = {
         );
         if (prevHasStart && !prevHasEnd) {
           consumedEntryIds.add(workEnd.id);
-          workEnd = null;
+          workEnd = undefined;
         }
       }
 
