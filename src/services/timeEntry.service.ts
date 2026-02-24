@@ -1,6 +1,6 @@
 import { prisma } from '../prisma';
 import { AuditAction, AuditEntityType, TimeEntryType } from '@prisma/client';
-import { nowUTC7, todayDateUTC7 } from '../utils/time';
+import { todayDateUTC7 } from '../utils/time';
 import { auditService } from './audit.service';
 
 export type AvailableAction =
@@ -78,14 +78,13 @@ export const timeEntryService = {
       throw new Error(`Действие недоступно: ${type}`);
     }
 
-    const now = nowUTC7();
     const date = todayDateUTC7();
 
     await prisma.timeEntry.create({
       data: {
         employeeId,
         type,
-        timestamp: now,
+        timestamp: new Date(), // actual UTC for storage
         date,
       },
     });

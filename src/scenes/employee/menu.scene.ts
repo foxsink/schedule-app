@@ -2,7 +2,7 @@ import { Scenes } from 'telegraf';
 import { BotContext } from '../../types/context';
 import { timeEntryService } from '../../services/timeEntry.service';
 import { buildEmployeeKeyboard } from '../../keyboards/employee.keyboard';
-import { formatDate, nowUTC7 } from '../../utils/time';
+import { formatDate } from '../../utils/time';
 import { ADMIN_MENU_SCENE_ID } from '../admin/menu.scene';
 
 export const EMPLOYEE_MENU_SCENE_ID = 'employee_menu';
@@ -15,7 +15,7 @@ async function showMenu(ctx: BotContext) {
 
   const actions = await timeEntryService.getAvailableActions(ctx.employee.id);
   const keyboard = buildEmployeeKeyboard(actions);
-  const today = formatDate(nowUTC7());
+  const today = formatDate(new Date());
 
   let statusText: string;
   if (actions.length === 0) {

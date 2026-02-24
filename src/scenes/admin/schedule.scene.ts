@@ -1,7 +1,7 @@
 import { Scenes, Markup } from 'telegraf';
 import { BotContext } from '../../types/context';
 import { reportService, EmployeeStatus } from '../../services/report.service';
-import { formatDate, nowUTC7 } from '../../utils/time';
+import { formatDate } from '../../utils/time';
 import { ADMIN_MENU_SCENE_ID } from './menu.scene';
 
 export const ADMIN_SCHEDULE_SCENE_ID = 'admin_schedule';
@@ -26,7 +26,7 @@ adminScheduleScene.enter(async (ctx) => {
   }
 
   const schedule = await reportService.getDaySchedule();
-  const dateStr = formatDate(nowUTC7());
+  const dateStr = formatDate(new Date());
 
   const lines = [`📋 *Расписание на ${dateStr}*`, ''];
   if (schedule.length === 0) {

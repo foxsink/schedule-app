@@ -1,7 +1,7 @@
 import { BotContext } from '../../types/context';
 import { timeEntryService } from '../../services/timeEntry.service';
 import { buildEmployeeKeyboard } from '../../keyboards/employee.keyboard';
-import { formatDate, formatTime, nowUTC7 } from '../../utils/time';
+import { formatDate, formatTime } from '../../utils/time';
 import { TimeEntryType } from '@prisma/client';
 import { Telegraf } from 'telegraf';
 import { HISTORY_SCENE_ID } from './history.scene';
@@ -42,7 +42,7 @@ export function registerEmployeeActions(bot: Telegraf<BotContext>) {
 
       try {
         await timeEntryService.addEntry(ctx.employee.id, type);
-        const now = nowUTC7();
+        const now = new Date();
         await ctx.editMessageText(
           `${ACTION_MESSAGES[action]} в ${formatTime(now)}`,
           {
@@ -60,7 +60,7 @@ export function registerEmployeeActions(bot: Telegraf<BotContext>) {
       // Re-render menu
       const newActions = await timeEntryService.getAvailableActions(ctx.employee.id);
       const keyboard = buildEmployeeKeyboard(newActions);
-      const today = formatDate(nowUTC7());
+      const today = formatDate(new Date());
 
       let statusText: string;
       if (newActions.length === 0) {
