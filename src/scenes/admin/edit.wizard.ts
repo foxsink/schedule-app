@@ -3,7 +3,7 @@ import { BotContext } from '../../types/context';
 import { prisma } from '../../prisma';
 import { timeEntryService } from '../../services/timeEntry.service';
 import { parseTime, parseDate } from '../../utils/validation';
-import { formatDate, formatTime, todayDateUTC7 } from '../../utils/time';
+import { formatDate, formatTime, localInputToUtc, todayDateUTC7 } from '../../utils/time';
 import { TimeEntryType } from '@prisma/client';
 import { ADMIN_MENU_SCENE_ID } from './menu.scene';
 
@@ -163,7 +163,7 @@ export const adminEditWizard = new Scenes.WizardScene<BotContext>(
     if (!dateStr || !empId || !meta) return ctx.scene.leave();
 
     const date = new Date(`${dateStr}T00:00:00.000Z`);
-    const timestamp = new Date(`${dateStr}T${String(parsed.hours).padStart(2, '0')}:${String(parsed.minutes).padStart(2, '0')}:00.000Z`);
+    const timestamp = localInputToUtc(dateStr, parsed.hours, parsed.minutes);
 
     if (meta.startsWith('eid:')) {
       const entryId = parseInt(meta.slice(4), 10);

@@ -25,6 +25,13 @@ export function formatDate(date: Date): string {
   return `${day}.${m}.${y}`;
 }
 
+/** Convert local UTC+7 date+time input to UTC Date for storage */
+export function localInputToUtc(dateStr: string, hours: number, minutes: number): Date {
+  return new Date(
+    new Date(`${dateStr}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00.000Z`).getTime() - OFFSET_MS
+  );
+}
+
 /** Start of day in UTC+7 (as UTC Date, for DB queries) */
 export function startOfDayUTC7(date?: Date): Date {
   const d = date ? toUTC7(date) : nowUTC7();
