@@ -128,7 +128,7 @@ const PERIOD_KEYBOARD = Markup.inlineKeyboard([
     Markup.button.callback('Этот месяц', 'hist_month'),
     Markup.button.callback('Ввести даты', 'hist_custom'),
   ],
-  [Markup.button.callback('« Назад', 'hist_back')],
+  [Markup.button.callback('📋 Меню', 'hist_back')],
 ]);
 
 export const historyScene = new Scenes.WizardScene<BotContext>(
@@ -184,7 +184,7 @@ export const historyScene = new Scenes.WizardScene<BotContext>(
 
 historyScene.action('hist_today', async (ctx) => {
   await ctx.answerCbQuery();
-  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [[{ text: '✓ Сегодня', callback_data: 'noop' }]] }); } catch {}
+  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [[{ text: '📋 Меню', callback_data: 'go_menu' }]] }); } catch {}
   if (!ctx.employee) return ctx.scene.leave();
   const today = todayDateUTC7();
   await showHistory(ctx, today, today);
@@ -193,7 +193,7 @@ historyScene.action('hist_today', async (ctx) => {
 
 historyScene.action('hist_week', async (ctx) => {
   await ctx.answerCbQuery();
-  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [[{ text: '✓ Эта неделя', callback_data: 'noop' }]] }); } catch {}
+  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [[{ text: '📋 Меню', callback_data: 'go_menu' }]] }); } catch {}
   if (!ctx.employee) return ctx.scene.leave();
   const now = nowUTC7();
   const dayOfWeek = now.getUTCDay();
@@ -209,7 +209,7 @@ historyScene.action('hist_week', async (ctx) => {
 
 historyScene.action('hist_month', async (ctx) => {
   await ctx.answerCbQuery();
-  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [[{ text: '✓ Этот месяц', callback_data: 'noop' }]] }); } catch {}
+  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [[{ text: '📋 Меню', callback_data: 'go_menu' }]] }); } catch {}
   if (!ctx.employee) return ctx.scene.leave();
   const now = nowUTC7();
   const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
