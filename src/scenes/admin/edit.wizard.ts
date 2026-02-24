@@ -88,7 +88,11 @@ async function showEntryActions(ctx: BotContext, entryId: number): Promise<void>
   );
 }
 
-async function showAddTypeMenu(ctx: BotContext, entries: Array<{ type: TimeEntryType }>): Promise<void> {
+async function showAddTypeMenu(
+  ctx: BotContext,
+  entries: Array<{ type: TimeEntryType }>,
+  prevDayShiftOpen = false,
+): Promise<void> {
   const count = (t: TimeEntryType) => entries.filter((e) => e.type === t).length;
   const existingTypes = new Set(entries.map((e) => e.type));
 
@@ -102,17 +106,22 @@ async function showAddTypeMenu(ctx: BotContext, entries: Array<{ type: TimeEntry
   const onLunch = count(TimeEntryType.LUNCH_START) > count(TimeEntryType.LUNCH_END);
   const onLeave = count(TimeEntryType.PERSONAL_LEAVE_START) > count(TimeEntryType.PERSONAL_LEAVE_END);
 
+  // Cross-midnight: treat as if shift has already started
+  const effectiveWorkStarted = existingTypes.has(TimeEntryType.WORK_START) || prevDayShiftOpen;
+
   const rows = Object.entries(TYPE_LABELS).map(([type, label]) => {
     const t = type as TimeEntryType;
-    const noWorkStart = !existingTypes.has(TimeEntryType.WORK_START);
+    const noWorkStart = !effectiveWorkStarted;
     const alreadyDone = SINGLE_USE.includes(t) && existingTypes.has(t);
     const requiresWorkStart = noWorkStart && t !== TimeEntryType.WORK_START && t !== TimeEntryType.SICK_LEAVE;
-    const sickLeaveBlocked = t === TimeEntryType.SICK_LEAVE && existingTypes.has(TimeEntryType.WORK_START);
+    // Block work_start if previous day's shift is still open
+    const workStartCrossMidnight = prevDayShiftOpen && t === TimeEntryType.WORK_START && !existingTypes.has(TimeEntryType.WORK_START);
+    const sickLeaveBlocked = t === TimeEntryType.SICK_LEAVE && effectiveWorkStarted;
     const lunchEndBlocked = t === TimeEntryType.LUNCH_END && !existingTypes.has(TimeEntryType.LUNCH_START);
     const returnBlocked = t === TimeEntryType.PERSONAL_LEAVE_END && !onLeave;
     const onLunchBlocked = onLunch && t !== TimeEntryType.LUNCH_END;
     const onLeaveBlocked = onLeave && t !== TimeEntryType.PERSONAL_LEAVE_END;
-    const blocked = onSickLeave || onLunchBlocked || onLeaveBlocked || requiresWorkStart || sickLeaveBlocked || lunchEndBlocked || returnBlocked;
+    const blocked = onSickLeave || onLunchBlocked || onLeaveBlocked || requiresWorkStart || workStartCrossMidnight || sickLeaveBlocked || lunchEndBlocked || returnBlocked;
 
     const icon = alreadyDone ? '✅' : blocked ? '❌' : null;
     return [
@@ -327,7 +336,15 @@ adminEditWizard.action('edit_add', async (ctx) => {
   if (!empId || !dateStr) return;
   const date = new Date(`${dateStr}T00:00:00.000Z`);
   const entries = await timeEntryService.getEntriesByDate(empId, date);
-  await showAddTypeMenu(ctx, entries);
+
+  // Check if previous day has an open shift (cross-midnight)
+  const prevDate = new Date(date.getTime() - 86_400_000);
+  const prevEntries = await prisma.timeEntry.findMany({ where: { employeeId: empId, date: prevDate } });
+  const prevTypes = prevEntries.map((e) => e.type);
+  const prevDayShiftOpen =
+    prevTypes.includes(TimeEntryType.WORK_START) && !prevTypes.includes(TimeEntryType.WORK_END);
+
+  await showAddTypeMenu(ctx, entries, prevDayShiftOpen);
 });
 
 // Add entry — type selected
