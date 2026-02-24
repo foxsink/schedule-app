@@ -42,8 +42,13 @@ export function createBot(): Telegraf<BotContext> {
   bot.use(sessionMiddleware);
   bot.use(authMiddleware);
 
-  // Must be before stage so scenes don't swallow it
+  // Must be before stage so scenes don't swallow these callbacks
   bot.action('noop', (ctx) => ctx.answerCbQuery());
+  bot.action('go_menu', async (ctx) => {
+    await ctx.answerCbQuery();
+    const sceneId = getMainMenuSceneId(ctx.employee?.role);
+    return ctx.scene.enter(sceneId);
+  });
 
   bot.use(stage.middleware());
 
@@ -80,13 +85,6 @@ export function createBot(): Telegraf<BotContext> {
   bot.command('employee', async (ctx) => {
     if (!ctx.employee) return ctx.scene.enter('start');
     return ctx.scene.enter(EMPLOYEE_MENU_SCENE_ID);
-  });
-
-  // "Back to menu" button on stale messages
-  bot.action('go_menu', async (ctx) => {
-    await ctx.answerCbQuery();
-    const sceneId = getMainMenuSceneId(ctx.employee?.role);
-    return ctx.scene.enter(sceneId);
   });
 
   // Unhandled callback queries — auto-redirect to menu
