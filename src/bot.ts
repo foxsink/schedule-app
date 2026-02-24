@@ -41,6 +41,10 @@ export function createBot(): Telegraf<BotContext> {
 
   bot.use(sessionMiddleware);
   bot.use(authMiddleware);
+
+  // Must be before stage so scenes don't swallow it
+  bot.action('noop', (ctx) => ctx.answerCbQuery());
+
   bot.use(stage.middleware());
 
   registerEmployeeActions(bot);
@@ -77,9 +81,6 @@ export function createBot(): Telegraf<BotContext> {
     if (!ctx.employee) return ctx.scene.enter('start');
     return ctx.scene.enter(EMPLOYEE_MENU_SCENE_ID);
   });
-
-  // No-op handler for inactive buttons
-  bot.action('noop', (ctx) => ctx.answerCbQuery());
 
   // "Back to menu" button on stale messages
   bot.action('go_menu', async (ctx) => {
