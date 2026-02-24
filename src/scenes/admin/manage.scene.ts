@@ -43,9 +43,10 @@ async function showEmployeeCard(ctx: BotContext, employeeId: number): Promise<vo
   const tgStr = emp.telegramId ? `@tg${emp.telegramId}` : 'не привязан';
   const codeStr = emp.invitationCode ? `Код: \`${emp.invitationCode}\`` : 'код использован';
 
+  const roleStr = emp.role === 'SUPER_ADMIN' ? '👑 Супер-админ' : emp.role === 'ADMIN' ? '🔧 Админ' : '👤 Сотрудник';
   const lines = [
     `👤 *${emp.lastName} ${emp.firstName}*`,
-    `Роль: ${emp.role}`,
+    `Роль: ${roleStr}`,
     `Статус: ${statusStr}`,
     `Telegram: ${tgStr}`,
     `${codeStr}`,
@@ -59,6 +60,11 @@ async function showEmployeeCard(ctx: BotContext, employeeId: number): Promise<vo
     rows.push([Markup.button.callback('🚫 Деактивировать', `mgmt_deact_${employeeId}`)]);
   } else {
     rows.push([Markup.button.callback('✅ Активировать', `mgmt_activate_${employeeId}`)]);
+  }
+  if (emp.role === 'EMPLOYEE') {
+    rows.push([Markup.button.callback('🔧 Сделать админом', `mgmt_role_admin_${employeeId}`)]);
+  } else if (emp.role === 'ADMIN') {
+    rows.push([Markup.button.callback('👤 Снять права админа', `mgmt_role_employee_${employeeId}`)]);
   }
   rows.push([Markup.button.callback('🔑 Новый код приглашения', `mgmt_newcode_${employeeId}`)]);
   rows.push([Markup.button.callback('🗑 Удалить сотрудника', `mgmt_delete_${employeeId}`)]);
@@ -186,6 +192,28 @@ adminManageScene.action(/^mgmt_newcode_(\d+)$/, async (ctx) => {
   const code = await employeeService.generateInvitationCode();
   await prisma.employee.update({ where: { id: empId }, data: { invitationCode: code } });
   await ctx.reply(`🔑 Новый код приглашения: \`${code}\``, { parse_mode: 'Markdown' });
+});
+
+adminManageScene.action(/^mgmt_role_admin_(\d+)$/, async (ctx) => {
+  await ctx.answerCbQuery();
+  const empId = parseInt(ctx.match[1], 10);
+  const editorId = ctx.employee?.id;
+  if (!editorId) return ctx.scene.leave();
+  await prisma.employee.update({ where: { id: empId }, data: { role: 'ADMIN' } });
+  await auditService.log(editorId, AuditAction.UPDATE, AuditEntityType.EMPLOYEE, empId, { role: 'EMPLOYEE' }, { role: 'ADMIN' });
+  await ctx.reply('🔧 Сотруднику выданы права администратора.');
+  await showEmployeeCard(ctx, empId);
+});
+
+adminManageScene.action(/^mgmt_role_employee_(\d+)$/, async (ctx) => {
+  await ctx.answerCbQuery();
+  const empId = parseInt(ctx.match[1], 10);
+  const editorId = ctx.employee?.id;
+  if (!editorId) return ctx.scene.leave();
+  await prisma.employee.update({ where: { id: empId }, data: { role: 'EMPLOYEE' } });
+  await auditService.log(editorId, AuditAction.UPDATE, AuditEntityType.EMPLOYEE, empId, { role: 'ADMIN' }, { role: 'EMPLOYEE' });
+  await ctx.reply('👤 Права администратора сняты.');
+  await showEmployeeCard(ctx, empId);
 });
 
 adminManageScene.action(/^mgmt_delete_(\d+)$/, async (ctx) => {
