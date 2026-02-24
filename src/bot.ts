@@ -13,6 +13,8 @@ import { adminReportWizard } from './scenes/admin/report.wizard';
 import { adminEditWizard } from './scenes/admin/edit.wizard';
 import { adminManageScene } from './scenes/admin/manage.scene';
 import { adminSalaryWizard } from './scenes/admin/salary.wizard';
+import { adminExportWizard } from './scenes/admin/export.wizard';
+import { adminAuditScene } from './scenes/admin/audit.scene';
 
 export function createBot(): Telegraf<BotContext> {
   const bot = new Telegraf<BotContext>(config.botToken);
@@ -27,6 +29,8 @@ export function createBot(): Telegraf<BotContext> {
     adminEditWizard,
     adminManageScene,
     adminSalaryWizard,
+    adminExportWizard,
+    adminAuditScene,
   ]);
 
   bot.use(sessionMiddleware);

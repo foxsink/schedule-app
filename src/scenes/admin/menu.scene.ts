@@ -14,18 +14,18 @@ adminMenuScene.enter(async (ctx) => {
   const isSuperAdmin = ctx.employee.role === 'SUPER_ADMIN';
 
   const rows = [
-    [Markup.button.callback('📋 Расписание', 'admin_schedule')],
-    [Markup.button.callback('📊 Отчёты', 'admin_reports')],
-    [Markup.button.callback('✏️ Редактирование записей', 'admin_edit')],
-    [Markup.button.callback('👥 Сотрудники', 'admin_employees')],
-    [Markup.button.callback('💰 Зарплаты', 'admin_salaries')],
-    [Markup.button.callback('📥 Экспорт', 'admin_export')],
+    [Markup.button.callback('Расписание', 'admin_schedule')],
+    [Markup.button.callback('Отчёты', 'admin_reports')],
+    [Markup.button.callback('Редактирование записей', 'admin_edit')],
+    [Markup.button.callback('Сотрудники', 'admin_employees')],
+    [Markup.button.callback('Зарплаты', 'admin_salaries')],
+    [Markup.button.callback('Экспорт', 'admin_export')],
   ];
   if (isSuperAdmin) {
-    rows.push([Markup.button.callback('🔍 Аудит', 'admin_audit')]);
+    rows.push([Markup.button.callback('Аудит', 'admin_audit')]);
   }
 
-  await ctx.reply(`👔 Меню администратора, ${ctx.employee.firstName}`, Markup.inlineKeyboard(rows));
+  await ctx.reply(`Меню администратора, ${ctx.employee.firstName}`, Markup.inlineKeyboard(rows));
 });
 
 adminMenuScene.action('admin_schedule', async (ctx) => {
@@ -55,10 +55,10 @@ adminMenuScene.action('admin_salaries', async (ctx) => {
 
 adminMenuScene.action('admin_export', async (ctx) => {
   await ctx.answerCbQuery();
-  await ctx.reply('Экспорт в Excel — будет добавлено в этапе 8.');
+  return ctx.scene.enter('admin_export');
 });
 
 adminMenuScene.action('admin_audit', async (ctx) => {
   await ctx.answerCbQuery();
-  await ctx.reply('Аудит-лог — будет добавлен в этапе 8.');
+  return ctx.scene.enter('admin_audit');
 });
