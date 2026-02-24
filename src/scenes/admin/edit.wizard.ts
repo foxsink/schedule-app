@@ -248,7 +248,7 @@ adminEditWizard.action(/^edit_change_(\d+)$/, async (ctx) => {
   while (ctx.wizard.cursor < 2) ctx.wizard.next();
   await ctx.reply(
     'Введите новое время в формате ЧЧ:ММ или выберите:',
-    Markup.inlineKeyboard([[Markup.button.callback(`🕐 Сейчас (${formatTime(nowUTC7())})`, 'edit_time_now')]]),
+    Markup.inlineKeyboard([[Markup.button.callback(`🕐 Сейчас (${formatTime(new Date())})`, 'edit_time_now')]]),
   );
 });
 
@@ -313,7 +313,7 @@ adminEditWizard.action(/^edit_add_type_(.+)$/, async (ctx) => {
             Markup.button.callback(`+30 мин (${formatTime(t30)})`, 'edit_lunch_end_30'),
             Markup.button.callback(`+1 час (${formatTime(t60)})`, 'edit_lunch_end_60'),
           ],
-          [Markup.button.callback(`🕐 Сейчас (${formatTime(nowUTC7())})`, 'edit_time_now')],
+          [Markup.button.callback(`🕐 Сейчас (${formatTime(new Date())})`, 'edit_time_now')],
         ]),
       );
       return;
@@ -324,7 +324,7 @@ adminEditWizard.action(/^edit_add_type_(.+)$/, async (ctx) => {
   while (ctx.wizard.cursor < 2) ctx.wizard.next();
   await ctx.reply(
     `Введите время для "${TYPE_LABELS[type]}" в формате ЧЧ:ММ или выберите:`,
-    Markup.inlineKeyboard([[Markup.button.callback(`🕐 Сейчас (${formatTime(nowUTC7())})`, 'edit_time_now')]]),
+    Markup.inlineKeyboard([[Markup.button.callback(`🕐 Сейчас (${formatTime(new Date())})`, 'edit_time_now')]]),
   );
 });
 
