@@ -89,11 +89,11 @@ export function createBot(): Telegraf<BotContext> {
     return ctx.scene.enter(sceneId);
   });
 
-  // Unhandled callback queries (stale buttons from old messages)
+  // Unhandled callback queries — auto-redirect to menu
   bot.on('callback_query', async (ctx) => {
-    try {
-      await ctx.answerCbQuery('Кнопка устарела. Используйте /menu');
-    } catch {}
+    try { await ctx.answerCbQuery(); } catch {}
+    const sceneId = getMainMenuSceneId(ctx.employee?.role);
+    return ctx.scene.enter(sceneId);
   });
 
   // Unhandled text messages
