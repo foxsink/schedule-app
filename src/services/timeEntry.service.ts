@@ -43,8 +43,13 @@ export const timeEntryService = {
       const yesterday = new Date(todayDateUTC7().getTime() - 86_400_000);
       const prevEntries = await prisma.timeEntry.findMany({ where: { employeeId, date: yesterday } });
       const prevTypes = prevEntries.map((e) => e.type);
+      // Cross-midnight shift is closed if today has WORK_END without a matching WORK_START
+      const todayHasCrossMidnightEnd =
+        types.includes(TimeEntryType.WORK_END) && !types.includes(TimeEntryType.WORK_START);
       const prevShiftOpen =
-        prevTypes.includes(TimeEntryType.WORK_START) && !prevTypes.includes(TimeEntryType.WORK_END);
+        prevTypes.includes(TimeEntryType.WORK_START) &&
+        !prevTypes.includes(TimeEntryType.WORK_END) &&
+        !todayHasCrossMidnightEnd;
 
       if (!prevShiftOpen) {
         return ['work_start', 'sick_leave'];

@@ -10,10 +10,10 @@ import { PERIOD_KEYBOARD } from '../../keyboards/admin.keyboard';
 export const ADMIN_REPORT_SCENE_ID = 'admin_report';
 
 function parseDate(str: string): Date | null {
-  const match = str.trim().match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+  const match = str.trim().match(/^(\d{2})\.(\d{2})\.(\d{2})$/);
   if (!match) return null;
-  const [, day, month, year] = match;
-  const date = new Date(`${year}-${month}-${day}T00:00:00.000Z`);
+  const [, day, month, yy] = match;
+  const date = new Date(`20${yy}-${month}-${day}T00:00:00.000Z`);
   return isNaN(date.getTime()) ? null : date;
 }
 
@@ -134,7 +134,7 @@ async function showEmployeeKeyboard(ctx: BotContext): Promise<void> {
   const rows: ReturnType<typeof Markup.button.callback>[][] = [
     [Markup.button.callback('👥 Все сотрудники', 'rpt_emp_all')],
     ...employees.map((e) => [Markup.button.callback(`${e.lastName} ${e.firstName}`, `rpt_emp_${e.id}`)]),
-    [Markup.button.callback('« Назад', 'rpt_emp_back')],
+    [Markup.button.callback('« Назад', 'rpt_emp_back'), Markup.button.callback('📋 Меню', 'go_menu')],
   ];
 
   await ctx.reply('Выберите сотрудника:', Markup.inlineKeyboard(rows));
@@ -156,28 +156,37 @@ export const adminReportWizard = new Scenes.WizardScene<BotContext>(
   // Step 2: custom start date text input
   async (ctx) => {
     if (!ctx.message || !('text' in ctx.message)) {
-      await ctx.reply('Введите дату начала в формате ДД.ММ.ГГГГ:');
+      await ctx.reply('Введите дату начала в формате ДД.ММ.ГГ:');
       return;
     }
     const date = parseDate(ctx.message.text);
     if (!date) {
-      await ctx.reply('Неверный формат. Введите дату начала в формате ДД.ММ.ГГГГ:');
+      await ctx.reply(
+        'Неверный формат. Введите дату начала в формате ДД.ММ.ГГ:',
+        Markup.inlineKeyboard([[Markup.button.callback('✗ Отмена', 'rpt_cancel_custom'), Markup.button.callback('📋 Меню', 'go_menu')]]),
+      );
       return;
     }
     ctx.scene.session.selectedPeriodFrom = date.toISOString().slice(0, 10);
     ctx.wizard.next();
-    await ctx.reply('Введите дату окончания в формате ДД.ММ.ГГГГ:');
+    await ctx.reply(
+      'Введите дату окончания в формате ДД.ММ.ГГ:',
+      Markup.inlineKeyboard([[Markup.button.callback('✗ Отмена', 'rpt_cancel_custom'), Markup.button.callback('📋 Меню', 'go_menu')]]),
+    );
   },
 
   // Step 3: custom end date text input → show report
   async (ctx) => {
     if (!ctx.message || !('text' in ctx.message)) {
-      await ctx.reply('Введите дату окончания в формате ДД.ММ.ГГГГ:');
+      await ctx.reply('Введите дату окончания в формате ДД.ММ.ГГ:');
       return;
     }
     const date = parseDate(ctx.message.text);
     if (!date) {
-      await ctx.reply('Неверный формат. Введите дату окончания в формате ДД.ММ.ГГГГ:');
+      await ctx.reply(
+        'Неверный формат. Введите дату окончания в формате ДД.ММ.ГГ:',
+        Markup.inlineKeyboard([[Markup.button.callback('✗ Отмена', 'rpt_cancel_custom'), Markup.button.callback('📋 Меню', 'go_menu')]]),
+      );
       return;
     }
     const fromStr = ctx.scene.session.selectedPeriodFrom;
@@ -187,7 +196,10 @@ export const adminReportWizard = new Scenes.WizardScene<BotContext>(
     }
     const from = new Date(`${fromStr}T00:00:00.000Z`);
     if (from > date) {
-      await ctx.reply('Дата начала не может быть позже даты окончания. Введите дату окончания:');
+      await ctx.reply(
+        'Дата начала не может быть позже даты окончания. Введите дату окончания:',
+        Markup.inlineKeyboard([[Markup.button.callback('✗ Отмена', 'rpt_cancel_custom'), Markup.button.callback('📋 Меню', 'go_menu')]]),
+      );
       return;
     }
     await showReport(ctx, from, date);
@@ -250,7 +262,17 @@ adminReportWizard.action('rpt_month', async (ctx) => {
 adminReportWizard.action('rpt_custom', async (ctx) => {
   await ctx.answerCbQuery();
   ctx.wizard.next();
-  await ctx.reply('Введите дату начала в формате ДД.ММ.ГГГГ:');
+  await ctx.reply(
+    'Введите дату начала в формате ДД.ММ.ГГ:',
+    Markup.inlineKeyboard([[Markup.button.callback('✗ Отмена', 'rpt_cancel_custom'), Markup.button.callback('📋 Меню', 'go_menu')]]),
+  );
+});
+
+adminReportWizard.action('rpt_cancel_custom', async (ctx) => {
+  await ctx.answerCbQuery();
+  ctx.scene.session.selectedPeriodFrom = undefined;
+  ctx.wizard.selectStep(1);
+  await ctx.reply('Выберите период:', PERIOD_KEYBOARD);
 });
 
 adminReportWizard.action('rpt_back', async (ctx) => {

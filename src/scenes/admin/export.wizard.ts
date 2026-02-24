@@ -10,7 +10,7 @@ export const ADMIN_EXPORT_SCENE_ID = 'admin_export';
 const PERIOD_KEYBOARD = Markup.inlineKeyboard([
   [Markup.button.callback('Эта неделя', 'exp_week'), Markup.button.callback('Этот месяц', 'exp_month')],
   [Markup.button.callback('Ввести даты', 'exp_custom')],
-  [Markup.button.callback('« Назад', 'exp_back')],
+  [Markup.button.callback('« Назад', 'exp_back'), Markup.button.callback('📋 Меню', 'go_menu')],
 ]);
 
 async function sendExcel(ctx: BotContext, from: Date, to: Date): Promise<void> {
@@ -35,23 +35,44 @@ export const adminExportWizard = new Scenes.WizardScene<BotContext>(
 
   // Step 1: custom start date
   async (ctx) => {
-    if (!ctx.message || !('text' in ctx.message)) { await ctx.reply('Введите дату начала (ДД.ММ.ГГГГ):'); return; }
+    if (!ctx.message || !('text' in ctx.message)) { await ctx.reply('Введите дату начала (ДД.ММ.ГГ):'); return; }
     const date = parseDate(ctx.message.text);
-    if (!date) { await ctx.reply('Неверный формат. Введите дату начала (ДД.ММ.ГГГГ):'); return; }
+    if (!date) {
+      await ctx.reply(
+        'Неверный формат. Введите дату начала (ДД.ММ.ГГ):',
+        Markup.inlineKeyboard([[Markup.button.callback('✗ Отмена', 'exp_cancel_custom'), Markup.button.callback('📋 Меню', 'go_menu')]]),
+      );
+      return;
+    }
     ctx.scene.session.selectedPeriodFrom = date.toISOString().slice(0, 10);
     ctx.wizard.next();
-    await ctx.reply('Введите дату окончания (ДД.ММ.ГГГГ):');
+    await ctx.reply(
+      'Введите дату окончания (ДД.ММ.ГГ):',
+      Markup.inlineKeyboard([[Markup.button.callback('✗ Отмена', 'exp_cancel_custom'), Markup.button.callback('📋 Меню', 'go_menu')]]),
+    );
   },
 
   // Step 2: custom end date
   async (ctx) => {
-    if (!ctx.message || !('text' in ctx.message)) { await ctx.reply('Введите дату окончания (ДД.ММ.ГГГГ):'); return; }
+    if (!ctx.message || !('text' in ctx.message)) { await ctx.reply('Введите дату окончания (ДД.ММ.ГГ):'); return; }
     const date = parseDate(ctx.message.text);
-    if (!date) { await ctx.reply('Неверный формат. Введите дату окончания (ДД.ММ.ГГГГ):'); return; }
+    if (!date) {
+      await ctx.reply(
+        'Неверный формат. Введите дату окончания (ДД.ММ.ГГ):',
+        Markup.inlineKeyboard([[Markup.button.callback('✗ Отмена', 'exp_cancel_custom'), Markup.button.callback('📋 Меню', 'go_menu')]]),
+      );
+      return;
+    }
     const fromStr = ctx.scene.session.selectedPeriodFrom;
     if (!fromStr) return ctx.scene.leave();
     const from = new Date(`${fromStr}T00:00:00.000Z`);
-    if (from > date) { await ctx.reply('Дата начала позже окончания. Введите дату окончания:'); return; }
+    if (from > date) {
+      await ctx.reply(
+        'Дата начала позже окончания. Введите дату окончания:',
+        Markup.inlineKeyboard([[Markup.button.callback('✗ Отмена', 'exp_cancel_custom'), Markup.button.callback('📋 Меню', 'go_menu')]]),
+      );
+      return;
+    }
     await sendExcel(ctx, from, date);
     return ctx.scene.enter(ADMIN_MENU_SCENE_ID);
   }
@@ -83,7 +104,17 @@ adminExportWizard.action('exp_month', async (ctx) => {
 adminExportWizard.action('exp_custom', async (ctx) => {
   await ctx.answerCbQuery();
   ctx.wizard.next();
-  await ctx.reply('Введите дату начала (ДД.ММ.ГГГГ):');
+  await ctx.reply(
+    'Введите дату начала (ДД.ММ.ГГ):',
+    Markup.inlineKeyboard([[Markup.button.callback('✗ Отмена', 'exp_cancel_custom'), Markup.button.callback('📋 Меню', 'go_menu')]]),
+  );
+});
+
+adminExportWizard.action('exp_cancel_custom', async (ctx) => {
+  await ctx.answerCbQuery();
+  ctx.scene.session.selectedPeriodFrom = undefined;
+  ctx.wizard.selectStep(0);
+  await ctx.reply('Экспорт в Excel\nВыберите период:', PERIOD_KEYBOARD);
 });
 
 adminExportWizard.action('exp_back', async (ctx) => {

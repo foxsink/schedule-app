@@ -29,7 +29,7 @@ function formatSalaryResult(r: Awaited<ReturnType<typeof salaryService.calculate
 const PERIOD_KEYBOARD = Markup.inlineKeyboard([
   [Markup.button.callback('Сегодня', 'sal_today'), Markup.button.callback('Эта неделя', 'sal_week')],
   [Markup.button.callback('Этот месяц', 'sal_month'), Markup.button.callback('Ввести даты', 'sal_custom')],
-  [Markup.button.callback('« Назад', 'sal_back')],
+  [Markup.button.callback('« Назад', 'sal_back'), Markup.button.callback('📋 Меню', 'go_menu')],
 ]);
 
 async function showEmployeeList(ctx: BotContext): Promise<void> {
@@ -40,7 +40,7 @@ async function showEmployeeList(ctx: BotContext): Promise<void> {
   const rows: ReturnType<typeof Markup.button.callback>[][] = [
     [Markup.button.callback('👥 Все сотрудники', 'sal_emp_all')],
     ...employees.map((e) => [Markup.button.callback(`${e.lastName} ${e.firstName}`, `sal_emp_${e.id}`)]),
-    [Markup.button.callback('« Назад', 'sal_back')],
+    [Markup.button.callback('« Назад', 'sal_back'), Markup.button.callback('📋 Меню', 'go_menu')],
   ];
   await ctx.reply('Выберите сотрудника для расчёта зарплаты:', Markup.inlineKeyboard(rows));
 }
@@ -87,23 +87,44 @@ export const adminSalaryWizard = new Scenes.WizardScene<BotContext>(
 
   // Step 2: custom start date
   async (ctx) => {
-    if (!ctx.message || !('text' in ctx.message)) { await ctx.reply('Введите дату начала (ДД.ММ.ГГГГ):'); return; }
+    if (!ctx.message || !('text' in ctx.message)) { await ctx.reply('Введите дату начала (ДД.ММ.ГГ):'); return; }
     const date = parseDate(ctx.message.text);
-    if (!date) { await ctx.reply('Неверный формат. Введите дату начала (ДД.ММ.ГГГГ):'); return; }
+    if (!date) {
+      await ctx.reply(
+        'Неверный формат. Введите дату начала (ДД.ММ.ГГ):',
+        Markup.inlineKeyboard([[Markup.button.callback('✗ Отмена', 'sal_cancel_input'), Markup.button.callback('📋 Меню', 'go_menu')]]),
+      );
+      return;
+    }
     ctx.scene.session.selectedPeriodFrom = date.toISOString().slice(0, 10);
     ctx.wizard.next();
-    await ctx.reply('Введите дату окончания (ДД.ММ.ГГГГ):');
+    await ctx.reply(
+      'Введите дату окончания (ДД.ММ.ГГ):',
+      Markup.inlineKeyboard([[Markup.button.callback('✗ Отмена', 'sal_cancel_input'), Markup.button.callback('📋 Меню', 'go_menu')]]),
+    );
   },
 
   // Step 3: custom end date
   async (ctx) => {
-    if (!ctx.message || !('text' in ctx.message)) { await ctx.reply('Введите дату окончания (ДД.ММ.ГГГГ):'); return; }
+    if (!ctx.message || !('text' in ctx.message)) { await ctx.reply('Введите дату окончания (ДД.ММ.ГГ):'); return; }
     const date = parseDate(ctx.message.text);
-    if (!date) { await ctx.reply('Неверный формат. Введите дату окончания (ДД.ММ.ГГГГ):'); return; }
+    if (!date) {
+      await ctx.reply(
+        'Неверный формат. Введите дату окончания (ДД.ММ.ГГ):',
+        Markup.inlineKeyboard([[Markup.button.callback('✗ Отмена', 'sal_cancel_input'), Markup.button.callback('📋 Меню', 'go_menu')]]),
+      );
+      return;
+    }
     const fromStr = ctx.scene.session.selectedPeriodFrom;
     if (!fromStr) return ctx.scene.leave();
     const from = new Date(`${fromStr}T00:00:00.000Z`);
-    if (from > date) { await ctx.reply('Дата начала не может быть позже даты окончания:'); return; }
+    if (from > date) {
+      await ctx.reply(
+        'Дата начала не может быть позже даты окончания:',
+        Markup.inlineKeyboard([[Markup.button.callback('✗ Отмена', 'sal_cancel_input'), Markup.button.callback('📋 Меню', 'go_menu')]]),
+      );
+      return;
+    }
     await showSalaryForPeriod(ctx, from, date);
     ctx.wizard.selectStep(0);
   },
@@ -120,12 +141,13 @@ export const adminSalaryWizard = new Scenes.WizardScene<BotContext>(
     const empId = parseInt(parts[1], 10);
     const adjType = parts[2] as 'BONUS' | 'PENALTY';
 
+    const cancelKb = Markup.inlineKeyboard([[Markup.button.callback('✗ Отмена', 'sal_cancel_input'), Markup.button.callback('📋 Меню', 'go_menu')]]);
     const spaceIdx = ctx.message.text.indexOf(' ');
-    if (spaceIdx === -1) { await ctx.reply('Введите сумму и причину через пробел (например: 1000 За хорошую работу):'); return; }
+    if (spaceIdx === -1) { await ctx.reply('Введите сумму и причину через пробел (например: 1000 За хорошую работу):', cancelKb); return; }
     const amount = parseFloat(ctx.message.text.slice(0, spaceIdx).replace(',', '.'));
     const reason = ctx.message.text.slice(spaceIdx + 1).trim();
-    if (isNaN(amount) || amount <= 0) { await ctx.reply('Неверная сумма. Введите число и причину:'); return; }
-    if (!reason) { await ctx.reply('Укажите причину после суммы:'); return; }
+    if (isNaN(amount) || amount <= 0) { await ctx.reply('Неверная сумма. Введите число и причину:', cancelKb); return; }
+    if (!reason) { await ctx.reply('Укажите причину после суммы:', cancelKb); return; }
 
     const today = todayDateUTC7();
     const adj = await salaryService.addAdjustment(empId, adjType, amount, today, reason);
@@ -193,7 +215,18 @@ adminSalaryWizard.action('sal_month', async (ctx) => {
 adminSalaryWizard.action('sal_custom', async (ctx) => {
   await ctx.answerCbQuery();
   ctx.wizard.next();
-  await ctx.reply('Введите дату начала (ДД.ММ.ГГГГ):');
+  await ctx.reply(
+    'Введите дату начала (ДД.ММ.ГГ):',
+    Markup.inlineKeyboard([[Markup.button.callback('✗ Отмена', 'sal_cancel_input'), Markup.button.callback('📋 Меню', 'go_menu')]]),
+  );
+});
+
+adminSalaryWizard.action('sal_cancel_input', async (ctx) => {
+  await ctx.answerCbQuery();
+  ctx.scene.session.selectedDate = undefined;
+  ctx.scene.session.selectedPeriodFrom = undefined;
+  ctx.wizard.selectStep(1);
+  await ctx.reply('Выберите период:', PERIOD_KEYBOARD);
 });
 
 adminSalaryWizard.action(/^sal_bonus_(\d+)$/, async (ctx) => {
@@ -201,7 +234,10 @@ adminSalaryWizard.action(/^sal_bonus_(\d+)$/, async (ctx) => {
   const empId = parseInt(ctx.match[1], 10);
   ctx.scene.session.selectedDate = `adj:${empId}:BONUS`;
   ctx.wizard.selectStep(4);
-  await ctx.reply('Введите сумму премии и причину через пробел (например: 1000 За хорошую работу):');
+  await ctx.reply(
+    'Введите сумму премии и причину через пробел (например: 1000 За хорошую работу):',
+    Markup.inlineKeyboard([[Markup.button.callback('✗ Отмена', 'sal_cancel_input'), Markup.button.callback('📋 Меню', 'go_menu')]]),
+  );
 });
 
 adminSalaryWizard.action(/^sal_penalty_(\d+)$/, async (ctx) => {
@@ -209,7 +245,10 @@ adminSalaryWizard.action(/^sal_penalty_(\d+)$/, async (ctx) => {
   const empId = parseInt(ctx.match[1], 10);
   ctx.scene.session.selectedDate = `adj:${empId}:PENALTY`;
   ctx.wizard.selectStep(4);
-  await ctx.reply('Введите сумму штрафа и причину через пробел (например: 500 Опоздание):');
+  await ctx.reply(
+    'Введите сумму штрафа и причину через пробел (например: 500 Опоздание):',
+    Markup.inlineKeyboard([[Markup.button.callback('✗ Отмена', 'sal_cancel_input'), Markup.button.callback('📋 Меню', 'go_menu')]]),
+  );
 });
 
 adminSalaryWizard.action('sal_back', async (ctx) => {

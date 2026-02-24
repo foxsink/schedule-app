@@ -24,7 +24,7 @@ async function showEmployeeList(ctx: BotContext): Promise<void> {
       const status = e.isActive ? '' : ' [неакт.]';
       return [Markup.button.callback(`${e.lastName} ${e.firstName}${status}`, `mgmt_emp_${e.id}`)];
     }),
-    [Markup.button.callback('« Назад', 'mgmt_back')],
+    [Markup.button.callback('« Назад', 'mgmt_back'), Markup.button.callback('📋 Меню', 'go_menu')],
   ];
 
   await ctx.reply('👥 Управление сотрудниками:', Markup.inlineKeyboard(rows));
@@ -68,7 +68,7 @@ async function showEmployeeCard(ctx: BotContext, employeeId: number): Promise<vo
   }
   rows.push([Markup.button.callback('🔑 Новый код приглашения', `mgmt_newcode_${employeeId}`)]);
   rows.push([Markup.button.callback('🗑 Удалить сотрудника', `mgmt_delete_${employeeId}`)]);
-  rows.push([Markup.button.callback('« К списку', 'mgmt_list')]);
+  rows.push([Markup.button.callback('« К списку', 'mgmt_list'), Markup.button.callback('📋 Меню', 'go_menu')]);
 
   await ctx.reply(lines.join('\n'), { parse_mode: 'Markdown', ...Markup.inlineKeyboard(rows) });
 }
@@ -92,7 +92,10 @@ export const adminManageScene = new Scenes.WizardScene<BotContext>(
       // Expect "FirstName LastName"
       const parts = ctx.message.text.trim().split(/\s+/);
       if (parts.length < 2) {
-        await ctx.reply('Введите имя и фамилию через пробел (например: Иван Петров):');
+        await ctx.reply(
+          'Введите имя и фамилию через пробел (например: Иван Петров):',
+          Markup.inlineKeyboard([[Markup.button.callback('✗ Отмена', 'mgmt_cancel_input'), Markup.button.callback('📋 Меню', 'go_menu')]]),
+        );
         return;
       }
       const [firstName, ...rest] = parts;
@@ -111,11 +114,17 @@ export const adminManageScene = new Scenes.WizardScene<BotContext>(
       const empId = parseInt(meta.slice(9), 10);
       const rate = parseFloat(ctx.message.text.replace(',', '.'));
       if (isNaN(rate) || rate < 0) {
-        await ctx.reply('Введите корректную ставку (число, например 250.50):');
+        await ctx.reply(
+          'Введите корректную ставку (число, например 250.50):',
+          Markup.inlineKeyboard([[Markup.button.callback('✗ Отмена', 'mgmt_cancel_input'), Markup.button.callback('📋 Меню', 'go_menu')]]),
+        );
         return;
       }
       ctx.scene.session.selectedDate = `set_rate2:${empId}:${rate}`;
-      await ctx.reply('Введите дату вступления в силу (ДД.ММ.ГГГГ):');
+      await ctx.reply(
+        'Введите дату вступления в силу (ДД.ММ.ГГ):',
+        Markup.inlineKeyboard([[Markup.button.callback('✗ Отмена', 'mgmt_cancel_input'), Markup.button.callback('📋 Меню', 'go_menu')]]),
+      );
       return;
     }
 
@@ -125,7 +134,10 @@ export const adminManageScene = new Scenes.WizardScene<BotContext>(
       const rate = parseFloat(parts2[1]);
       const date = parseDate(ctx.message.text);
       if (!date) {
-        await ctx.reply('Неверный формат. Введите дату в формате ДД.ММ.ГГГГ:');
+        await ctx.reply(
+          'Неверный формат. Введите дату в формате ДД.ММ.ГГ:',
+          Markup.inlineKeyboard([[Markup.button.callback('✗ Отмена', 'mgmt_cancel_input'), Markup.button.callback('📋 Меню', 'go_menu')]]),
+        );
         return;
       }
       const rateRecord = await employeeService.setRate(empId, rate, date);
@@ -145,7 +157,10 @@ adminManageScene.action('mgmt_create', async (ctx) => {
   await ctx.answerCbQuery();
   ctx.scene.session.selectedDate = 'new_emp';
   ctx.wizard.selectStep(1);
-  await ctx.reply('Введите имя и фамилию сотрудника через пробел (например: Иван Петров):');
+  await ctx.reply(
+    'Введите имя и фамилию сотрудника через пробел (например: Иван Петров):',
+    Markup.inlineKeyboard([[Markup.button.callback('✗ Отмена', 'mgmt_cancel_input'), Markup.button.callback('📋 Меню', 'go_menu')]]),
+  );
 });
 
 adminManageScene.action(/^mgmt_emp_(\d+)$/, async (ctx) => {
@@ -160,7 +175,10 @@ adminManageScene.action(/^mgmt_rate_(\d+)$/, async (ctx) => {
   const empId = parseInt(ctx.match[1], 10);
   ctx.scene.session.selectedDate = `set_rate:${empId}`;
   ctx.wizard.selectStep(1);
-  await ctx.reply('Введите ставку в рублях за час (например: 250.50):');
+  await ctx.reply(
+    'Введите ставку в рублях за час (например: 250.50):',
+    Markup.inlineKeyboard([[Markup.button.callback('✗ Отмена', 'mgmt_cancel_input'), Markup.button.callback('📋 Меню', 'go_menu')]]),
+  );
 });
 
 adminManageScene.action(/^mgmt_deact_(\d+)$/, async (ctx) => {
@@ -259,6 +277,19 @@ adminManageScene.action(/^mgmt_confirm_delete_(\d+)$/, async (ctx) => {
 
   await ctx.reply(`🗑 Сотрудник *${emp.lastName} ${emp.firstName}* удалён.`, { parse_mode: 'Markdown' });
   await showEmployeeList(ctx);
+});
+
+adminManageScene.action('mgmt_cancel_input', async (ctx) => {
+  await ctx.answerCbQuery();
+  const meta = ctx.scene.session.selectedDate;
+  ctx.scene.session.selectedDate = undefined;
+  ctx.wizard.selectStep(0);
+  if (meta && (meta.startsWith('set_rate:') || meta.startsWith('set_rate2:'))) {
+    const empId = parseInt(meta.split(':')[1], 10);
+    await showEmployeeCard(ctx, empId);
+  } else {
+    await showEmployeeList(ctx);
+  }
 });
 
 adminManageScene.action('mgmt_list', async (ctx) => {

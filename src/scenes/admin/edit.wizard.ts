@@ -65,7 +65,7 @@ async function showEntriesList(ctx: BotContext, employeeId: number, date: Date):
   const keyboard = Markup.inlineKeyboard([
     ...entryButtons,
     [Markup.button.callback('➕ Добавить запись', 'edit_add')],
-    [Markup.button.callback('« Назад', 'edit_back_to_emp')],
+    [Markup.button.callback('« Назад', 'edit_back_to_emp'), Markup.button.callback('📋 Меню', 'go_menu')],
   ]);
 
   await ctx.reply(lines.join('\n'), { parse_mode: 'Markdown', ...keyboard });
@@ -80,7 +80,7 @@ async function showEntryActions(ctx: BotContext, entryId: number): Promise<void>
   const keyboard = Markup.inlineKeyboard([
     [Markup.button.callback('⏱ Изменить время', `edit_change_${entryId}`)],
     [Markup.button.callback('🗑 Удалить', `edit_delete_${entryId}`)],
-    [Markup.button.callback('« Назад', 'edit_back_to_list')],
+    [Markup.button.callback('« Назад', 'edit_back_to_list'), Markup.button.callback('📋 Меню', 'go_menu')],
   ]);
   await ctx.reply(
     `Запись: *${TYPE_LABELS[entry.type]}* в ${formatTime(entry.timestamp)}\nВыберите действие:`,
@@ -149,7 +149,7 @@ async function showAddTypeMenu(
   });
   const keyboard = Markup.inlineKeyboard([
     ...rows,
-    [Markup.button.callback('« Назад', 'edit_back_to_list')],
+    [Markup.button.callback('« Назад', 'edit_back_to_list'), Markup.button.callback('📋 Меню', 'go_menu')],
   ]);
   await ctx.reply('Выберите тип записи:', keyboard);
 }
@@ -170,7 +170,10 @@ export const adminEditWizard = new Scenes.WizardScene<BotContext>(
     }
     const date = parseDate(ctx.message.text);
     if (!date) {
-      await ctx.reply('Неверный формат. Введите дату в формате ДД.ММ.ГГ:');
+      await ctx.reply(
+        'Неверный формат. Введите дату в формате ДД.ММ.ГГ:',
+        Markup.inlineKeyboard([[Markup.button.callback('📋 Меню', 'go_menu')]]),
+      );
       return;
     }
     const empId = ctx.scene.session.selectedEmployeeId;
@@ -188,7 +191,10 @@ export const adminEditWizard = new Scenes.WizardScene<BotContext>(
     }
     const parsed = parseTime(ctx.message.text);
     if (!parsed) {
-      await ctx.reply('Неверный формат. Введите время в формате ЧЧ:ММ (например, 09:30):');
+      await ctx.reply(
+        'Неверный формат. Введите время в формате ЧЧ:ММ (например, 09:30):',
+        Markup.inlineKeyboard([[Markup.button.callback('« Назад к списку', 'edit_cancel_input'), Markup.button.callback('📋 Меню', 'go_menu')]]),
+      );
       return;
     }
 
@@ -281,7 +287,10 @@ adminEditWizard.action(/^edit_change_(\d+)$/, async (ctx) => {
   while (ctx.wizard.cursor < 2) ctx.wizard.next();
   await ctx.reply(
     'Введите новое время в формате ЧЧ:ММ или выберите:',
-    Markup.inlineKeyboard([[Markup.button.callback(`🕐 Сейчас (${formatTime(new Date())})`, 'edit_time_now')]]),
+    Markup.inlineKeyboard([
+      [Markup.button.callback(`🕐 Сейчас (${formatTime(new Date())})`, 'edit_time_now')],
+      [Markup.button.callback('« Назад к списку', 'edit_cancel_input'), Markup.button.callback('📋 Меню', 'go_menu')],
+    ]),
   );
 });
 
@@ -398,6 +407,7 @@ adminEditWizard.action(/^edit_add_type_(.+)$/, async (ctx) => {
             Markup.button.callback(`+1 час (${formatTime(t60)})`, 'edit_lunch_end_60'),
           ],
           [Markup.button.callback(`🕐 Сейчас (${formatTime(new Date())})`, 'edit_time_now')],
+          [Markup.button.callback('« Назад к списку', 'edit_cancel_input'), Markup.button.callback('📋 Меню', 'go_menu')],
         ]),
       );
       return;
@@ -408,7 +418,10 @@ adminEditWizard.action(/^edit_add_type_(.+)$/, async (ctx) => {
   while (ctx.wizard.cursor < 2) ctx.wizard.next();
   await ctx.reply(
     `Введите время для "${TYPE_LABELS[type]}" в формате ЧЧ:ММ или выберите:`,
-    Markup.inlineKeyboard([[Markup.button.callback(`🕐 Сейчас (${formatTime(new Date())})`, 'edit_time_now')]]),
+    Markup.inlineKeyboard([
+      [Markup.button.callback(`🕐 Сейчас (${formatTime(new Date())})`, 'edit_time_now')],
+      [Markup.button.callback('« Назад к списку', 'edit_cancel_input'), Markup.button.callback('📋 Меню', 'go_menu')],
+    ]),
   );
 });
 
@@ -464,6 +477,17 @@ adminEditWizard.action('edit_back_to_list', async (ctx) => {
   const dateStr = ctx.scene.session.selectedPeriodFrom;
   if (!empId || !dateStr) return ctx.scene.enter(ADMIN_MENU_SCENE_ID);
   const date = new Date(`${dateStr}T00:00:00.000Z`);
+  await showEntriesList(ctx, empId, date);
+});
+
+adminEditWizard.action('edit_cancel_input', async (ctx) => {
+  await ctx.answerCbQuery();
+  ctx.scene.session.selectedDate = undefined;
+  const empId = ctx.scene.session.selectedEmployeeId;
+  const dateStr = ctx.scene.session.selectedPeriodFrom;
+  if (!empId || !dateStr) return ctx.scene.enter(ADMIN_MENU_SCENE_ID);
+  const date = new Date(`${dateStr}T00:00:00.000Z`);
+  ctx.wizard.selectStep(2);
   await showEntriesList(ctx, empId, date);
 });
 

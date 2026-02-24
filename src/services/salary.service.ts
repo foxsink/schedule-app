@@ -92,13 +92,12 @@ export const salaryService = {
       const get = (t: TimeEntryType) =>
         dayEntries.find((e) => e.type === t && !consumedEntryIds.has(e.id));
 
-      const workStart = get(TimeEntryType.WORK_START);
+      let workStart = get(TimeEntryType.WORK_START);
       let workEnd = get(TimeEntryType.WORK_END);
 
       // Cross-midnight case A: WORK_END is on same calendar day but its timestamp
       // is earlier than WORK_START — the shift started the previous day and ended after midnight.
-      // Consume this WORK_END so the previous day can claim it (it should have been consumed
-      // during prev-day processing if prev day was fetched; this handles the fallback).
+      // Mark this WORK_END as consumed so the previous day can claim it via Case B.
       if (workStart && workEnd && workEnd.timestamp.getTime() < workStart.timestamp.getTime()) {
         const prevDateKey = new Date(date.getTime() - 86_400_000).toISOString().slice(0, 10);
         const prevDayEntries = byDate.get(prevDateKey) ?? [];
@@ -114,8 +113,9 @@ export const salaryService = {
         }
       }
 
-      // Cross-midnight case B: WORK_END recorded on next calendar day
-      if (workStart && !workEnd) {
+      // Cross-midnight case B: WORK_END recorded on next calendar day.
+      // Only consume when this day is in range; otherwise leave the entry for Case C below.
+      if (workStart && !workEnd && isInRange) {
         const nextDateKey = new Date(date.getTime() + 86_400_000).toISOString().slice(0, 10);
         const nextDayEntries = byDate.get(nextDateKey) ?? [];
         const crossDayEnd = nextDayEntries.find(
@@ -124,6 +124,20 @@ export const salaryService = {
         if (crossDayEnd) {
           workEnd = crossDayEnd;
           consumedEntryIds.add(crossDayEnd.id);
+        }
+      }
+
+      // Cross-midnight case C: WORK_START is on previous calendar day.
+      // Handles reports where only the WORK_END day is in range.
+      if (!workStart && workEnd && isInRange) {
+        const prevDateKey = new Date(date.getTime() - 86_400_000).toISOString().slice(0, 10);
+        const prevDayEntries = byDate.get(prevDateKey) ?? [];
+        const crossDayStart = prevDayEntries.find(
+          (e) => e.type === TimeEntryType.WORK_START && !consumedEntryIds.has(e.id),
+        );
+        if (crossDayStart) {
+          consumedEntryIds.add(crossDayStart.id);
+          workStart = crossDayStart;
         }
       }
 

@@ -19,10 +19,10 @@ const TYPE_LABELS: Record<TimeEntryType, string> = {
 };
 
 function parseDate(str: string): Date | null {
-  const match = str.trim().match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+  const match = str.trim().match(/^(\d{2})\.(\d{2})\.(\d{2})$/);
   if (!match) return null;
-  const [, day, month, year] = match;
-  const date = new Date(`${year}-${month}-${day}T00:00:00.000Z`);
+  const [, day, month, yy] = match;
+  const date = new Date(`20${yy}-${month}-${day}T00:00:00.000Z`);
   if (isNaN(date.getTime())) return null;
   return date;
 }
@@ -142,28 +142,37 @@ export const historyScene = new Scenes.WizardScene<BotContext>(
   // Step 1: ask for start date (custom flow)
   async (ctx) => {
     if (!ctx.message || !('text' in ctx.message)) {
-      await ctx.reply('Введите дату начала в формате ДД.ММ.ГГГГ:');
+      await ctx.reply('Введите дату начала в формате ДД.ММ.ГГ:');
       return;
     }
     const date = parseDate(ctx.message.text);
     if (!date) {
-      await ctx.reply('Неверный формат. Введите дату начала в формате ДД.ММ.ГГГГ:');
+      await ctx.reply(
+        'Неверный формат. Введите дату начала в формате ДД.ММ.ГГ:',
+        Markup.inlineKeyboard([[Markup.button.callback('✗ Отмена', 'hist_cancel_custom'), Markup.button.callback('📋 Меню', 'go_menu')]]),
+      );
       return;
     }
     ctx.scene.session.selectedPeriodFrom = date.toISOString().slice(0, 10);
-    await ctx.reply('Введите дату окончания в формате ДД.ММ.ГГГГ:');
+    await ctx.reply(
+      'Введите дату окончания в формате ДД.ММ.ГГ:',
+      Markup.inlineKeyboard([[Markup.button.callback('✗ Отмена', 'hist_cancel_custom'), Markup.button.callback('📋 Меню', 'go_menu')]]),
+    );
     return ctx.wizard.next();
   },
 
   // Step 2: ask for end date, then show
   async (ctx) => {
     if (!ctx.message || !('text' in ctx.message)) {
-      await ctx.reply('Введите дату окончания в формате ДД.ММ.ГГГГ:');
+      await ctx.reply('Введите дату окончания в формате ДД.ММ.ГГ:');
       return;
     }
     const date = parseDate(ctx.message.text);
     if (!date) {
-      await ctx.reply('Неверный формат. Введите дату окончания в формате ДД.ММ.ГГГГ:');
+      await ctx.reply(
+        'Неверный формат. Введите дату окончания в формате ДД.ММ.ГГ:',
+        Markup.inlineKeyboard([[Markup.button.callback('✗ Отмена', 'hist_cancel_custom'), Markup.button.callback('📋 Меню', 'go_menu')]]),
+      );
       return;
     }
     if (!ctx.employee || !ctx.scene.session.selectedPeriodFrom) {
@@ -173,7 +182,10 @@ export const historyScene = new Scenes.WizardScene<BotContext>(
     const from = new Date(`${ctx.scene.session.selectedPeriodFrom}T00:00:00.000Z`);
     const to = date;
     if (from > to) {
-      await ctx.reply('Дата начала не может быть позже даты окончания. Введите дату окончания:');
+      await ctx.reply(
+        'Дата начала не может быть позже даты окончания. Введите дату окончания:',
+        Markup.inlineKeyboard([[Markup.button.callback('✗ Отмена', 'hist_cancel_custom'), Markup.button.callback('📋 Меню', 'go_menu')]]),
+      );
       return;
     }
     await showHistory(ctx, from, to);
@@ -220,8 +232,18 @@ historyScene.action('hist_month', async (ctx) => {
 
 historyScene.action('hist_custom', async (ctx) => {
   await ctx.answerCbQuery();
-  await ctx.reply('Введите дату начала в формате ДД.ММ.ГГГГ:');
+  await ctx.reply(
+    'Введите дату начала в формате ДД.ММ.ГГ:',
+    Markup.inlineKeyboard([[Markup.button.callback('✗ Отмена', 'hist_cancel_custom'), Markup.button.callback('📋 Меню', 'go_menu')]]),
+  );
   return ctx.wizard.next();
+});
+
+historyScene.action('hist_cancel_custom', async (ctx) => {
+  await ctx.answerCbQuery();
+  ctx.scene.session.selectedPeriodFrom = undefined;
+  ctx.wizard.selectStep(0);
+  await ctx.reply('Выберите период:', PERIOD_KEYBOARD);
 });
 
 historyScene.action('hist_back', async (ctx) => {
