@@ -104,7 +104,7 @@ async function showAddTypeMenu(ctx: BotContext, existingTypes: Set<TimeEntryType
     const requiresWorkStart = noWorkStart && t !== TimeEntryType.WORK_START && t !== TimeEntryType.SICK_LEAVE;
     const sickLeaveBlocked = t === TimeEntryType.SICK_LEAVE && existingTypes.has(TimeEntryType.WORK_START);
     const lunchEndBlocked = t === TimeEntryType.LUNCH_END && !existingTypes.has(TimeEntryType.LUNCH_START);
-    const returnBlocked = t === TimeEntryType.PERSONAL_LEAVE_END && !existingTypes.has(TimeEntryType.PERSONAL_LEAVE_START);
+    const returnBlocked = t === TimeEntryType.PERSONAL_LEAVE_END && !onLeave;
     const onLunchBlocked = onLunch && t !== TimeEntryType.LUNCH_END;
     const onLeaveBlocked = onLeave && t !== TimeEntryType.PERSONAL_LEAVE_END;
     const blocked = onSickLeave || onLunchBlocked || onLeaveBlocked || requiresWorkStart || sickLeaveBlocked || lunchEndBlocked || returnBlocked;
