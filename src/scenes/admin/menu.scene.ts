@@ -45,12 +45,12 @@ adminMenuScene.action('admin_edit', async (ctx) => {
 
 adminMenuScene.action('admin_employees', async (ctx) => {
   await ctx.answerCbQuery();
-  await ctx.reply('Управление сотрудниками — будет добавлено в этапе 7.');
+  return ctx.scene.enter('admin_manage');
 });
 
 adminMenuScene.action('admin_salaries', async (ctx) => {
   await ctx.answerCbQuery();
-  await ctx.reply('Управление зарплатами — будет добавлено в этапе 7.');
+  return ctx.scene.enter('admin_salary');
 });
 
 adminMenuScene.action('admin_export', async (ctx) => {
