@@ -98,12 +98,14 @@ async function showAddTypeMenu(ctx: BotContext, existingTypes: Set<TimeEntryType
   const rows = Object.entries(TYPE_LABELS).map(([type, label]) => {
     const t = type as TimeEntryType;
     const noWorkStart = !existingTypes.has(TimeEntryType.WORK_START);
+    const onLunch = existingTypes.has(TimeEntryType.LUNCH_START) && !existingTypes.has(TimeEntryType.LUNCH_END);
     const alreadyDone = SINGLE_USE.includes(t) && existingTypes.has(t);
     const requiresWorkStart = noWorkStart && t !== TimeEntryType.WORK_START && t !== TimeEntryType.SICK_LEAVE;
     const sickLeaveBlocked = t === TimeEntryType.SICK_LEAVE && existingTypes.has(TimeEntryType.WORK_START);
     const lunchEndBlocked = t === TimeEntryType.LUNCH_END && !existingTypes.has(TimeEntryType.LUNCH_START);
     const returnBlocked = t === TimeEntryType.PERSONAL_LEAVE_END && !existingTypes.has(TimeEntryType.PERSONAL_LEAVE_START);
-    const blocked = onSickLeave || requiresWorkStart || sickLeaveBlocked || lunchEndBlocked || returnBlocked;
+    const onLunchBlocked = onLunch && t !== TimeEntryType.LUNCH_END;
+    const blocked = onSickLeave || onLunchBlocked || requiresWorkStart || sickLeaveBlocked || lunchEndBlocked || returnBlocked;
 
     const icon = alreadyDone ? '✅' : blocked ? '❌' : null;
     return [
