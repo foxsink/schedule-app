@@ -78,6 +78,9 @@ export function createBot(): Telegraf<BotContext> {
     return ctx.scene.enter(EMPLOYEE_MENU_SCENE_ID);
   });
 
+  // No-op handler for inactive buttons
+  bot.action('noop', (ctx) => ctx.answerCbQuery());
+
   // "Back to menu" button on stale messages
   bot.action('go_menu', async (ctx) => {
     await ctx.answerCbQuery();

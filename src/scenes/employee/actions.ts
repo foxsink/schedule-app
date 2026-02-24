@@ -45,7 +45,12 @@ export function registerEmployeeActions(bot: Telegraf<BotContext>) {
         const now = nowUTC7();
         await ctx.editMessageText(
           `${ACTION_MESSAGES[action]} в ${formatTime(now)}`,
-          { parse_mode: 'Markdown' }
+          {
+            parse_mode: 'Markdown',
+            reply_markup: {
+              inline_keyboard: [[{ text: `${ACTION_MESSAGES[action]} в ${formatTime(now)}`, callback_data: 'noop' }]],
+            },
+          },
         );
       } catch {
         await ctx.answerCbQuery('Действие недоступно', { show_alert: true });
