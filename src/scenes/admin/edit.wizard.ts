@@ -33,7 +33,11 @@ async function showEmployeeList(ctx: BotContext): Promise<void> {
 
 async function showDateMenu(ctx: BotContext): Promise<void> {
   const keyboard = Markup.inlineKeyboard([
-    [Markup.button.callback('📅 Сегодня', 'edit_date_today')],
+    [
+      Markup.button.callback('📅 Сегодня', 'edit_date_today'),
+      Markup.button.callback('📅 Вчера', 'edit_date_yesterday'),
+      Markup.button.callback('📅 Позавчера', 'edit_date_2days'),
+    ],
     [Markup.button.callback('« Назад', 'edit_emp_back')],
   ]);
   await ctx.reply('Введите дату (ДД.ММ.ГГГГ) или выберите:', keyboard);
@@ -201,10 +205,30 @@ adminEditWizard.action('edit_date_today', async (ctx) => {
   await ctx.answerCbQuery();
   const empId = ctx.scene.session.selectedEmployeeId;
   if (!empId) return ctx.scene.leave();
-  const today = todayDateUTC7();
-  ctx.scene.session.selectedPeriodFrom = today.toISOString().slice(0, 10);
+  const date = todayDateUTC7();
+  ctx.scene.session.selectedPeriodFrom = date.toISOString().slice(0, 10);
   ctx.wizard.next();
-  await showEntriesList(ctx, empId, today);
+  await showEntriesList(ctx, empId, date);
+});
+
+adminEditWizard.action('edit_date_yesterday', async (ctx) => {
+  await ctx.answerCbQuery();
+  const empId = ctx.scene.session.selectedEmployeeId;
+  if (!empId) return ctx.scene.leave();
+  const date = new Date(todayDateUTC7().getTime() - 86_400_000);
+  ctx.scene.session.selectedPeriodFrom = date.toISOString().slice(0, 10);
+  ctx.wizard.next();
+  await showEntriesList(ctx, empId, date);
+});
+
+adminEditWizard.action('edit_date_2days', async (ctx) => {
+  await ctx.answerCbQuery();
+  const empId = ctx.scene.session.selectedEmployeeId;
+  if (!empId) return ctx.scene.leave();
+  const date = new Date(todayDateUTC7().getTime() - 2 * 86_400_000);
+  ctx.scene.session.selectedPeriodFrom = date.toISOString().slice(0, 10);
+  ctx.wizard.next();
+  await showEntriesList(ctx, empId, date);
 });
 
 // Entry selection
