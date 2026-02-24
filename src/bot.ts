@@ -5,12 +5,13 @@ import { sessionMiddleware } from './middleware/session';
 import { authMiddleware } from './middleware/auth';
 import { startScene } from './scenes/start.scene';
 import { employeeMenuScene, EMPLOYEE_MENU_SCENE_ID } from './scenes/employee/menu.scene';
+import { historyScene } from './scenes/employee/history.scene';
 import { registerEmployeeActions } from './scenes/employee/actions';
 
 export function createBot(): Telegraf<BotContext> {
   const bot = new Telegraf<BotContext>(config.botToken);
 
-  const stage = new Scenes.Stage<BotContext>([startScene, employeeMenuScene]);
+  const stage = new Scenes.Stage<BotContext>([startScene, employeeMenuScene, historyScene]);
 
   bot.use(sessionMiddleware);
   bot.use(authMiddleware);

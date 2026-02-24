@@ -4,6 +4,7 @@ import { buildEmployeeKeyboard } from '../../keyboards/employee.keyboard';
 import { formatDate, formatTime, nowUTC7 } from '../../utils/time';
 import { TimeEntryType } from '@prisma/client';
 import { Telegraf } from 'telegraf';
+import { HISTORY_SCENE_ID } from './history.scene';
 
 const ACTION_MESSAGES: Record<string, string> = {
   work_start: '🟢 Рабочий день начат',
@@ -72,7 +73,6 @@ export function registerEmployeeActions(bot: Telegraf<BotContext>) {
 
   bot.action('my_schedule', async (ctx) => {
     await ctx.answerCbQuery();
-    // TODO Phase 4: enter schedule scene
-    await ctx.reply('График будет доступен в следующем этапе.');
+    return ctx.scene.enter(HISTORY_SCENE_ID);
   });
 }
