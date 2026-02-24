@@ -293,9 +293,51 @@ adminEditWizard.action(/^edit_add_type_(.+)$/, async (ctx) => {
     return;
   }
 
+  // Lunch end — offer quick options based on lunch start time
+  if (type === TimeEntryType.LUNCH_END) {
+    const date = new Date(`${dateStr}T00:00:00.000Z`);
+    const entries = await timeEntryService.getEntriesByDate(empId, date);
+    const lunchStart = entries.find((e) => e.type === TimeEntryType.LUNCH_START);
+    if (lunchStart) {
+      const t30 = new Date(lunchStart.timestamp.getTime() + 30 * 60_000);
+      const t60 = new Date(lunchStart.timestamp.getTime() + 60 * 60_000);
+      ctx.scene.session.selectedDate = `add:${type}`;
+      while (ctx.wizard.cursor < 2) ctx.wizard.next();
+      await ctx.reply(
+        `Введите время конца обеда или выберите:`,
+        Markup.inlineKeyboard([
+          [
+            Markup.button.callback(`+30 мин (${formatTime(t30)})`, 'edit_lunch_end_30'),
+            Markup.button.callback(`+1 час (${formatTime(t60)})`, 'edit_lunch_end_60'),
+          ],
+        ]),
+      );
+      return;
+    }
+  }
+
   ctx.scene.session.selectedDate = `add:${type}`;
   while (ctx.wizard.cursor < 2) ctx.wizard.next();
   await ctx.reply(`Введите время для "${TYPE_LABELS[type]}" в формате ЧЧ:ММ:`);
+});
+
+adminEditWizard.action(/^edit_lunch_end_(30|60)$/, async (ctx) => {
+  await ctx.answerCbQuery();
+  const editorId = ctx.employee?.id;
+  const empId = ctx.scene.session.selectedEmployeeId;
+  const dateStr = ctx.scene.session.selectedPeriodFrom;
+  if (!editorId || !empId || !dateStr) return ctx.scene.leave();
+  const date = new Date(`${dateStr}T00:00:00.000Z`);
+  const entries = await timeEntryService.getEntriesByDate(empId, date);
+  const lunchStart = entries.find((e) => e.type === TimeEntryType.LUNCH_START);
+  if (!lunchStart) return ctx.scene.leave();
+  const offsetMin = ctx.match[1] === '30' ? 30 : 60;
+  const timestamp = new Date(lunchStart.timestamp.getTime() + offsetMin * 60_000);
+  await timeEntryService.createEntryManual(editorId, empId, TimeEntryType.LUNCH_END, timestamp, date);
+  ctx.scene.session.selectedDate = undefined;
+  ctx.wizard.selectStep(2);
+  await ctx.reply(`✅ Запись добавлена: ${TYPE_LABELS[TimeEntryType.LUNCH_END]} в ${formatTime(timestamp)}`);
+  await showEntriesList(ctx, empId, date);
 });
 
 // Navigation
