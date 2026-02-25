@@ -187,7 +187,7 @@ function validateEntryTime(
     const unclosed = leaveStarts[leaveEnds.length];
     if (T < unclosed.timestamp.getTime()) return 'Возврат должен быть не раньше начала отлучки.';
     const nextEvt = sorted.find((e) => e.timestamp.getTime() > unclosed.timestamp.getTime());
-    if (nextEvt && T >= nextEvt.timestamp.getTime()) {
+    if (nextEvt && T > nextEvt.timestamp.getTime()) {
       return `Время должно быть до следующего события (${formatTime(nextEvt.timestamp)} — ${TYPE_LABELS[nextEvt.type]}).`;
     }
   }
@@ -197,7 +197,7 @@ function validateEntryTime(
     if (!lunchStart) return 'Нет начала обеда.';
     if (T < lunchStart.timestamp.getTime()) return 'Конец обеда должен быть не раньше начала.';
     const nextEvt = sorted.find((e) => e.timestamp.getTime() > lunchStart.timestamp.getTime());
-    if (nextEvt && T >= nextEvt.timestamp.getTime()) {
+    if (nextEvt && T > nextEvt.timestamp.getTime()) {
       return `Время должно быть до следующего события (${formatTime(nextEvt.timestamp)} — ${TYPE_LABELS[nextEvt.type]}).`;
     }
   }
