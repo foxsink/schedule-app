@@ -1,6 +1,6 @@
 import { prisma } from './prisma';
 import { config } from './config';
-import { Role } from '@prisma/client';
+import { Role } from './generated/prisma/client';
 
 export async function seedSuperAdmin(): Promise<void> {
   const { superAdminTelegramId } = config;

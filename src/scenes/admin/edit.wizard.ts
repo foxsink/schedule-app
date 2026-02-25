@@ -4,7 +4,7 @@ import { prisma } from '../../prisma';
 import { timeEntryService } from '../../services/timeEntry.service';
 import { parseTime, parseDate } from '../../utils/validation';
 import { formatDate, formatTime, localInputToUtc, nowUTC7, todayDateUTC7 } from '../../utils/time';
-import { TimeEntryType } from '@prisma/client';
+import { TimeEntryType } from '../../generated/prisma/client';
 import { ADMIN_MENU_SCENE_ID } from './menu.scene';
 
 export const ADMIN_EDIT_SCENE_ID = 'admin_edit';

@@ -1,5 +1,5 @@
 import { prisma } from '../prisma';
-import { TimeEntryType } from '@prisma/client';
+import { TimeEntryType } from '../generated/prisma/client';
 import { todayDateUTC7, formatTime } from '../utils/time';
 
 export type EmployeeStatus =

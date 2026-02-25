@@ -1,6 +1,6 @@
 import { prisma } from '../prisma';
 import { generateInvitationCode } from '../utils/invitation';
-import { Role } from '@prisma/client';
+import { Role } from '../generated/prisma/client';
 
 export const employeeService = {
   async findByTelegramId(telegramId: bigint) {

@@ -12,7 +12,8 @@
     "prisma:studio": "prisma studio"
   },
   "dependencies": {
-    "@prisma/client": "^6.19.2",
+    "@prisma/adapter-pg": "^7.4.1",
+    "@prisma/client": "^7.4.1",
     "dotenv": "^16.4.5",
     "exceljs": "^4.4.0",
     "telegraf": "^4.16.3"
@@ -20,7 +21,7 @@
   "devDependencies": {
     "@types/node": "^20.11.0",
     "nodemon": "^3.1.0",
-    "prisma": "^6.19.2",
+    "prisma": "^7.4.1",
     "ts-node": "^10.9.2",
     "typescript": "^5.3.3"
   }

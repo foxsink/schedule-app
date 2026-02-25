@@ -2,7 +2,7 @@ import { BotContext } from '../../types/context';
 import { timeEntryService } from '../../services/timeEntry.service';
 import { buildEmployeeKeyboard } from '../../keyboards/employee.keyboard';
 import { formatDate, formatTime } from '../../utils/time';
-import { TimeEntryType } from '@prisma/client';
+import { TimeEntryType } from '../../generated/prisma/client';
 import { Telegraf } from 'telegraf';
 import { HISTORY_SCENE_ID } from './history.scene';
 

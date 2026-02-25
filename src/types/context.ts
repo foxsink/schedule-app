@@ -1,5 +1,5 @@
 import { Context, Scenes } from 'telegraf';
-import { Employee } from '@prisma/client';
+import { Employee } from '../generated/prisma/client';
 
 export interface SessionData extends Scenes.WizardSessionData {
   selectedEmployeeId?: number;

@@ -1,5 +1,5 @@
 import { prisma } from '../prisma';
-import { AdjustmentType, TimeEntryType } from '@prisma/client';
+import { AdjustmentType, TimeEntryType } from '../generated/prisma/client';
 import { formatTime } from '../utils/time';
 
 export interface DaySalary {

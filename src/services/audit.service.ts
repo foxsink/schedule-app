@@ -1,5 +1,5 @@
 import { prisma } from '../prisma';
-import { AuditAction, AuditEntityType } from '@prisma/client';
+import { AuditAction, AuditEntityType } from '../generated/prisma/client';
 
 export const auditService = {
   async log(

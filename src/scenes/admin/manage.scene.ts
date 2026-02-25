@@ -5,7 +5,7 @@ import { employeeService } from '../../services/employee.service';
 import { auditService } from '../../services/audit.service';
 import { parseDate } from '../../utils/validation';
 import { formatDate } from '../../utils/time';
-import { AuditAction, AuditEntityType } from '@prisma/client';
+import { AuditAction, AuditEntityType } from '../../generated/prisma/client';
 import { ADMIN_MENU_SCENE_ID } from './menu.scene';
 
 export const ADMIN_MANAGE_SCENE_ID = 'admin_manage';

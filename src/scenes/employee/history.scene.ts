@@ -2,7 +2,7 @@ import { Scenes, Markup } from 'telegraf';
 import { BotContext } from '../../types/context';
 import { prisma } from '../../prisma';
 import { formatDate, formatTime, nowUTC7, todayDateUTC7 } from '../../utils/time';
-import { TimeEntryType } from '@prisma/client';
+import { TimeEntryType } from '../../generated/prisma/client';
 
 export const HISTORY_SCENE_ID = 'employee_history';
 

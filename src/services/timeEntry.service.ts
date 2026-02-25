@@ -1,5 +1,5 @@
 import { prisma } from '../prisma';
-import { AuditAction, AuditEntityType, TimeEntryType } from '@prisma/client';
+import { AuditAction, AuditEntityType, TimeEntryType } from '../generated/prisma/client';
 import { todayDateUTC7 } from '../utils/time';
 import { auditService } from './audit.service';
 

@@ -2,7 +2,7 @@ import ExcelJS from 'exceljs';
 import { prisma } from '../prisma';
 import { salaryService } from './salary.service';
 import { formatDate } from '../utils/time';
-import { TimeEntryType } from '@prisma/client';
+import { TimeEntryType } from '../generated/prisma/client';
 
 export const excelService = {
   async generateSalaryReport(from: Date, to: Date): Promise<Buffer> {
