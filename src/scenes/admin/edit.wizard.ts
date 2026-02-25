@@ -300,10 +300,12 @@ adminEditWizard.action(/^edit_change_(\d+)$/, async (ctx) => {
   ctx.scene.session.selectedDate = `eid:${entryId}`;
   // ensure cursor is at step 2
   while (ctx.wizard.cursor < 2) ctx.wizard.next();
+  const dateStr = ctx.scene.session.selectedPeriodFrom;
+  const isToday = dateStr === todayDateUTC7().toISOString().slice(0, 10);
   await ctx.reply(
     'Введите новое время в формате ЧЧ:ММ или выберите:',
     Markup.inlineKeyboard([
-      [Markup.button.callback(`🕐 Сейчас (${formatTime(new Date())})`, 'edit_time_now')],
+      ...(isToday ? [[Markup.button.callback(`🕐 Сейчас (${formatTime(new Date())})`, 'edit_time_now')]] : []),
       [Markup.button.callback('« Назад к списку', 'edit_cancel_input'), Markup.button.callback('📋 Меню', 'go_menu')],
     ]),
   );
@@ -403,6 +405,8 @@ adminEditWizard.action(/^edit_add_type_(.+)$/, async (ctx) => {
     return;
   }
 
+  const isToday = dateStr === todayDateUTC7().toISOString().slice(0, 10);
+
   // Lunch end — offer quick options based on lunch start time
   if (type === TimeEntryType.LUNCH_END) {
     const date = new Date(`${dateStr}T00:00:00.000Z`);
@@ -421,7 +425,7 @@ adminEditWizard.action(/^edit_add_type_(.+)$/, async (ctx) => {
             Markup.button.callback(`+30 мин (${formatTime(t30)})`, 'edit_lunch_end_30'),
             Markup.button.callback(`+1 час (${formatTime(t60)})`, 'edit_lunch_end_60'),
           ],
-          [Markup.button.callback(`🕐 Сейчас (${formatTime(new Date())})`, 'edit_time_now')],
+          ...(isToday ? [[Markup.button.callback(`🕐 Сейчас (${formatTime(new Date())})`, 'edit_time_now')]] : []),
           [Markup.button.callback('« Назад к списку', 'edit_cancel_input'), Markup.button.callback('📋 Меню', 'go_menu')],
         ]),
       );
@@ -434,7 +438,7 @@ adminEditWizard.action(/^edit_add_type_(.+)$/, async (ctx) => {
   await ctx.reply(
     `Введите время для "${TYPE_LABELS[type]}" в формате ЧЧ:ММ или выберите:`,
     Markup.inlineKeyboard([
-      [Markup.button.callback(`🕐 Сейчас (${formatTime(new Date())})`, 'edit_time_now')],
+      ...(isToday ? [[Markup.button.callback(`🕐 Сейчас (${formatTime(new Date())})`, 'edit_time_now')]] : []),
       [Markup.button.callback('« Назад к списку', 'edit_cancel_input'), Markup.button.callback('📋 Меню', 'go_menu')],
     ]),
   );
@@ -466,6 +470,11 @@ adminEditWizard.action('edit_time_now', async (ctx) => {
   const dateStr = ctx.scene.session.selectedPeriodFrom;
   const meta = ctx.scene.session.selectedDate;
   if (!editorId || !empId || !dateStr || !meta) return ctx.scene.leave();
+
+  if (dateStr !== todayDateUTC7().toISOString().slice(0, 10)) {
+    await ctx.reply('Кнопка "Сейчас" доступна только для сегодняшней даты. Введите время вручную.');
+    return;
+  }
 
   const timestamp = new Date(); // actual UTC for storage
   const date = new Date(`${dateStr}T00:00:00.000Z`);
