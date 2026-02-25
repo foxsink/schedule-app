@@ -87,11 +87,9 @@ export const timeEntryService = {
       if (lunchOpen) return ['lunch_end'];
       if (leaveOpen) return ['personal_leave_end'];
 
-      const actions: AvailableAction[] = [];
-      if (countAll(TimeEntryType.LUNCH_START) === 0) actions.push('lunch_start');
-      actions.push('personal_leave_start');
-      actions.push('work_end');
-      return actions;
+      // Cross-midnight shift in progress and we are on the next calendar day:
+      // only allow ending the shift — no new lunch/leave until the shift is properly closed.
+      return ['work_end'];
     }
 
     // WORK_START exists today and shift is in progress (lastWorkStart is after lastWorkEnd or no WORK_END yet).
