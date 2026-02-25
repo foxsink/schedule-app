@@ -52,6 +52,22 @@ export function todayDateUTC7(): Date {
   return new Date(`${iso}T00:00:00.000Z`);
 }
 
+/** Returns [first, last] day of the current UTC+7 month. */
+export function currentMonthUTC7(): [Date, Date] {
+  const now = nowUTC7();
+  const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const to = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0)); // day 0 = last day of prev month
+  return [from, to];
+}
+
+/** Returns [first, last] day of the previous UTC+7 month. */
+export function previousMonthUTC7(): [Date, Date] {
+  const now = nowUTC7();
+  const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
+  const to = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 0));
+  return [from, to];
+}
+
 /** Returns [monday, sunday] of the current UTC+7 week (Mon–Sun). */
 export function currentWeekUTC7(): [Date, Date] {
   const now = nowUTC7();

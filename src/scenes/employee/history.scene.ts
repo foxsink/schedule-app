@@ -1,7 +1,7 @@
 import { Scenes, Markup } from 'telegraf';
 import { BotContext } from '../../types/context';
 import { prisma } from '../../prisma';
-import { currentWeekUTC7, formatDate, formatTime, nowUTC7, previousWeekUTC7, todayDateUTC7 } from '../../utils/time';
+import { currentMonthUTC7, currentWeekUTC7, formatDate, formatTime, nowUTC7, previousMonthUTC7, previousWeekUTC7, todayDateUTC7 } from '../../utils/time';
 import { TimeEntryType } from '../../generated/prisma/client';
 
 export const HISTORY_SCENE_ID = 'employee_history';
@@ -130,6 +130,9 @@ const PERIOD_KEYBOARD = Markup.inlineKeyboard([
   ],
   [
     Markup.button.callback('Этот месяц', 'hist_month'),
+    Markup.button.callback('Прошлый месяц', 'hist_last_month'),
+  ],
+  [
     Markup.button.callback('Ввести даты', 'hist_custom'),
   ],
   [Markup.button.callback('« Назад', 'hist_back'), Markup.button.callback('📋 Меню', 'go_menu')],
@@ -245,9 +248,16 @@ historyScene.action('hist_month', async (ctx) => {
   await ctx.answerCbQuery();
   try { await ctx.editMessageReplyMarkup({ inline_keyboard: [[{ text: '📋 Меню', callback_data: 'go_menu' }]] }); } catch {}
   if (!ctx.employee) return ctx.scene.leave();
-  const now = nowUTC7();
-  const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-  const to = todayDateUTC7();
+  const [from, to] = currentMonthUTC7();
+  await showHistory(ctx, from, to);
+  await ctx.reply('Выберите период:', PERIOD_KEYBOARD);
+});
+
+historyScene.action('hist_last_month', async (ctx) => {
+  await ctx.answerCbQuery();
+  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [[{ text: '📋 Меню', callback_data: 'go_menu' }]] }); } catch {}
+  if (!ctx.employee) return ctx.scene.leave();
+  const [from, to] = previousMonthUTC7();
   await showHistory(ctx, from, to);
   await ctx.reply('Выберите период:', PERIOD_KEYBOARD);
 });
