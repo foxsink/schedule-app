@@ -30,23 +30,30 @@ export const timeEntryService = {
   },
 
   async getAvailableActions(employeeId: number): Promise<AvailableAction[]> {
+    // entries ordered by timestamp ASC
     const entries = await this.getTodayEntries(employeeId);
     const types = entries.map((e) => e.type);
 
-    const has = (t: TimeEntryType) => types.includes(t);
+    if (types.includes(TimeEntryType.SICK_LEAVE)) return [];
 
-    if (has(TimeEntryType.SICK_LEAVE)) return [];
-    // Cross-midnight: today has WORK_END but no WORK_START — shift ended from yesterday, allow new shift
-    if (has(TimeEntryType.WORK_END) && has(TimeEntryType.WORK_START)) return [];
+    const workStarts = entries.filter((e) => e.type === TimeEntryType.WORK_START);
+    const workEnds = entries.filter((e) => e.type === TimeEntryType.WORK_END);
+    const lastWorkStart = workStarts[workStarts.length - 1];
+    const lastWorkEnd = workEnds[workEnds.length - 1];
 
-    if (!has(TimeEntryType.WORK_START)) {
-      // Check if previous day's shift is still open (cross-midnight)
+    // Shift complete: last WORK_END comes after last WORK_START (normal same-day close)
+    if (lastWorkStart && lastWorkEnd && lastWorkStart.timestamp.getTime() < lastWorkEnd.timestamp.getTime()) {
+      return [];
+    }
+
+    if (!lastWorkStart) {
+      // No WORK_START today — check cross-midnight scenario
       const yesterday = new Date(todayDateUTC7().getTime() - 86_400_000);
       const prevEntries = await prisma.timeEntry.findMany({ where: { employeeId, date: yesterday } });
       const prevTypes = prevEntries.map((e) => e.type);
-      // Cross-midnight shift is closed if today has WORK_END without a matching WORK_START
-      const todayHasCrossMidnightEnd =
-        types.includes(TimeEntryType.WORK_END) && !types.includes(TimeEntryType.WORK_START);
+
+      // todayHasCrossMidnightEnd: today has WORK_END (from closing yesterday's night shift)
+      const todayHasCrossMidnightEnd = !!lastWorkEnd;
       const prevShiftOpen =
         prevTypes.includes(TimeEntryType.WORK_START) &&
         !prevTypes.includes(TimeEntryType.WORK_END) &&
@@ -56,7 +63,7 @@ export const timeEntryService = {
         return ['work_start', 'sick_leave'];
       }
 
-      // Cross-midnight: combine prev+today for lunch/leave state
+      // Cross-midnight shift still in progress: combine prev+today for lunch/leave state
       const allTypes = [...prevTypes, ...types];
       const countAll = (t: TimeEntryType) => allTypes.filter((x) => x === t).length;
 
@@ -74,19 +81,26 @@ export const timeEntryService = {
       return actions;
     }
 
-    // Normal flow (today has WORK_START)
-    if (has(TimeEntryType.LUNCH_START) && !has(TimeEntryType.LUNCH_END)) {
+    // WORK_START exists today and shift is in progress (lastWorkStart is after lastWorkEnd or no WORK_END yet).
+    // Only consider entries from the CURRENT shift (at or after lastWorkStart).
+    const currentEntries = entries.filter(
+      (e) => e.timestamp.getTime() >= lastWorkStart.timestamp.getTime(),
+    );
+    const currentTypes = currentEntries.map((e) => e.type);
+    const hasC = (t: TimeEntryType) => currentTypes.includes(t);
+
+    if (hasC(TimeEntryType.LUNCH_START) && !hasC(TimeEntryType.LUNCH_END)) {
       return ['lunch_end'];
     }
 
-    if (has(TimeEntryType.PERSONAL_LEAVE_START)) {
-      const starts = types.filter((t) => t === TimeEntryType.PERSONAL_LEAVE_START).length;
-      const ends = types.filter((t) => t === TimeEntryType.PERSONAL_LEAVE_END).length;
+    if (hasC(TimeEntryType.PERSONAL_LEAVE_START)) {
+      const starts = currentTypes.filter((t) => t === TimeEntryType.PERSONAL_LEAVE_START).length;
+      const ends = currentTypes.filter((t) => t === TimeEntryType.PERSONAL_LEAVE_END).length;
       if (starts > ends) return ['personal_leave_end'];
     }
 
     const actions: AvailableAction[] = [];
-    if (!has(TimeEntryType.LUNCH_START)) actions.push('lunch_start');
+    if (!hasC(TimeEntryType.LUNCH_START)) actions.push('lunch_start');
     actions.push('personal_leave_start');
     actions.push('work_end');
     return actions;
