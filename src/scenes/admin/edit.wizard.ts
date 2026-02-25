@@ -362,6 +362,19 @@ export const adminEditWizard = new Scenes.WizardScene<BotContext>(
 
     if (meta.startsWith('eid:')) {
       const entryId = parseInt(meta.slice(4), 10);
+      const entry = await prisma.timeEntry.findUnique({ where: { id: entryId } });
+      if (entry) {
+        const shiftEntries = await collectShiftEntries(empId, dateStr);
+        const withoutSelf = shiftEntries.filter((e) => e.id !== entryId);
+        const validationError = validateEntryTime(entry.type, timestamp, withoutSelf);
+        if (validationError) {
+          await ctx.reply(
+            `❌ ${validationError}\n\nВведите другое время:`,
+            Markup.inlineKeyboard([[Markup.button.callback('« Назад к списку', 'edit_cancel_input'), Markup.button.callback('📋 Меню', 'go_menu')]]),
+          );
+          return;
+        }
+      }
       await timeEntryService.updateEntry(editorId, entryId, timestamp);
       await ctx.reply(`✅ Время обновлено на ${formatTime(timestamp)}`);
     } else if (meta.startsWith('add:')) {
@@ -646,6 +659,19 @@ adminEditWizard.action('edit_time_now', async (ctx) => {
 
   if (meta.startsWith('eid:')) {
     const entryId = parseInt(meta.slice(4), 10);
+    const entry = await prisma.timeEntry.findUnique({ where: { id: entryId } });
+    if (entry) {
+      const shiftEntries = await collectShiftEntries(empId, dateStr);
+      const withoutSelf = shiftEntries.filter((e) => e.id !== entryId);
+      const validationError = validateEntryTime(entry.type, timestamp, withoutSelf);
+      if (validationError) {
+        await ctx.reply(
+          `❌ ${validationError}\n\nВведите время вручную:`,
+          Markup.inlineKeyboard([[Markup.button.callback('« Назад к списку', 'edit_cancel_input'), Markup.button.callback('📋 Меню', 'go_menu')]]),
+        );
+        return;
+      }
+    }
     await timeEntryService.updateEntry(editorId, entryId, timestamp);
     await ctx.reply(`✅ Время обновлено на ${formatTime(timestamp)}`);
   } else if (meta.startsWith('add:')) {
