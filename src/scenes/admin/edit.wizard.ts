@@ -122,9 +122,10 @@ async function showAddTypeMenu(
   const onLeave =
     totalCount(TimeEntryType.PERSONAL_LEAVE_START) > totalCount(TimeEntryType.PERSONAL_LEAVE_END);
 
-  // Treat shift as started if: today has WORK_START, prev shift is open, or cross-midnight closed today
+  // Treat shift as started if: today has WORK_START, or cross-midnight shift is still in progress.
+  // crossMidnightShiftWasActive is NOT included — it means the shift was already closed today.
   const effectiveWorkStarted =
-    existingTypes.has(TimeEntryType.WORK_START) || prevDayShiftOpen || crossMidnightShiftWasActive;
+    existingTypes.has(TimeEntryType.WORK_START) || prevDayShiftOpen;
 
   const rows = Object.entries(TYPE_LABELS).map(([type, label]) => {
     const t = type as TimeEntryType;
