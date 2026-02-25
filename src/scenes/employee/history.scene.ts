@@ -122,10 +122,13 @@ async function showHistory(ctx: BotContext, from: Date, to: Date): Promise<void>
 const PERIOD_KEYBOARD = Markup.inlineKeyboard([
   [
     Markup.button.callback('Сегодня', 'hist_today'),
-    Markup.button.callback('Эта неделя', 'hist_week'),
+    Markup.button.callback('Вчера', 'hist_yesterday'),
   ],
   [
+    Markup.button.callback('Эта неделя', 'hist_week'),
     Markup.button.callback('Этот месяц', 'hist_month'),
+  ],
+  [
     Markup.button.callback('Ввести даты', 'hist_custom'),
   ],
   [Markup.button.callback('📋 Меню', 'hist_back')],
@@ -207,6 +210,15 @@ historyScene.action('hist_today', async (ctx) => {
   if (!ctx.employee) return ctx.scene.leave();
   const today = todayDateUTC7();
   await showHistory(ctx, today, today);
+  await ctx.reply('Выберите период:', PERIOD_KEYBOARD);
+});
+
+historyScene.action('hist_yesterday', async (ctx) => {
+  await ctx.answerCbQuery();
+  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [[{ text: '📋 Меню', callback_data: 'go_menu' }]] }); } catch {}
+  if (!ctx.employee) return ctx.scene.leave();
+  const yesterday = new Date(todayDateUTC7().getTime() - 86_400_000);
+  await showHistory(ctx, yesterday, yesterday);
   await ctx.reply('Выберите период:', PERIOD_KEYBOARD);
 });
 
