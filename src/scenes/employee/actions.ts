@@ -60,6 +60,11 @@ export function registerEmployeeActions(bot: Telegraf<BotContext>) {
       // Re-render menu
       const newActions = await timeEntryService.getAvailableActions(ctx.employee.id);
       const keyboard = buildEmployeeKeyboard(newActions);
+      if (ctx.employee.role === 'ADMIN' || ctx.employee.role === 'SUPER_ADMIN') {
+        keyboard.reply_markup.inline_keyboard.push([
+          { text: '🔧 Режим администратора', callback_data: 'switch_to_admin' },
+        ]);
+      }
       const today = formatDate(new Date());
 
       let statusText: string;
