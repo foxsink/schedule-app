@@ -15,19 +15,36 @@ export const ADMIN_MANAGE_SCENE_ID = 'admin_manage';
 
 async function showEmployeeList(ctx: BotContext): Promise<void> {
   const employees = await prisma.employee.findMany({
-    orderBy: [{ isActive: 'desc' }, { lastName: 'asc' }],
+    where: { isActive: true },
+    orderBy: { lastName: 'asc' },
   });
+
+  const inactiveCount = await prisma.employee.count({ where: { isActive: false } });
 
   const rows: ReturnType<typeof Markup.button.callback>[][] = [
     [Markup.button.callback('➕ Создать сотрудника', 'mgmt_create')],
-    ...employees.map((e) => {
-      const status = e.isActive ? '' : ' [неакт.]';
-      return [Markup.button.callback(`${e.lastName} ${e.firstName}${status}`, `mgmt_emp_${e.id}`)];
-    }),
-    [Markup.button.callback('« Назад', 'mgmt_back'), Markup.button.callback('📋 Меню', 'go_menu')],
+    ...employees.map((e) => [Markup.button.callback(`${e.lastName} ${e.firstName}`, `mgmt_emp_${e.id}`)]),
   ];
+  if (inactiveCount > 0) {
+    rows.push([Markup.button.callback(`🗂 Неактивные (${inactiveCount})`, 'mgmt_inactive_list')]);
+  }
+  rows.push([Markup.button.callback('« Назад', 'mgmt_back'), Markup.button.callback('📋 Меню', 'go_menu')]);
 
   await ctx.reply('👥 Управление сотрудниками:', Markup.inlineKeyboard(rows));
+}
+
+async function showInactiveEmployeeList(ctx: BotContext): Promise<void> {
+  const employees = await prisma.employee.findMany({
+    where: { isActive: false },
+    orderBy: { lastName: 'asc' },
+  });
+
+  const rows: ReturnType<typeof Markup.button.callback>[][] = [
+    ...employees.map((e) => [Markup.button.callback(`${e.lastName} ${e.firstName}`, `mgmt_emp_${e.id}`)]),
+    [Markup.button.callback('« К списку', 'mgmt_list'), Markup.button.callback('📋 Меню', 'go_menu')],
+  ];
+
+  await ctx.reply('🗂 Неактивные сотрудники:', Markup.inlineKeyboard(rows));
 }
 
 async function showEmployeeCard(ctx: BotContext, employeeId: number): Promise<void> {
@@ -293,6 +310,11 @@ adminManageScene.action('mgmt_cancel_input', async (ctx) => {
 adminManageScene.action('mgmt_list', async (ctx) => {
   await ctx.answerCbQuery();
   await showEmployeeList(ctx);
+});
+
+adminManageScene.action('mgmt_inactive_list', async (ctx) => {
+  await ctx.answerCbQuery();
+  await showInactiveEmployeeList(ctx);
 });
 
 adminManageScene.action('mgmt_back', async (ctx) => {
