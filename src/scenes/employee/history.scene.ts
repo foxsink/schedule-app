@@ -197,6 +197,10 @@ export const historyScene = new Scenes.WizardScene<BotContext>(
   }
 );
 
+historyScene.enter(async (ctx) => {
+  await ctx.reply('Выберите период:', PERIOD_KEYBOARD);
+});
+
 historyScene.action('hist_today', async (ctx) => {
   await ctx.answerCbQuery();
   try { await ctx.editMessageReplyMarkup({ inline_keyboard: [[{ text: '📋 Меню', callback_data: 'go_menu' }]] }); } catch {}
