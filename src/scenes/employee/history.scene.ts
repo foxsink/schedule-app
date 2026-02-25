@@ -131,7 +131,7 @@ const PERIOD_KEYBOARD = Markup.inlineKeyboard([
   [
     Markup.button.callback('Ввести даты', 'hist_custom'),
   ],
-  [Markup.button.callback('📋 Меню', 'hist_back')],
+  [Markup.button.callback('« Назад', 'hist_back'), Markup.button.callback('📋 Меню', 'go_menu')],
 ]);
 
 export const historyScene = new Scenes.WizardScene<BotContext>(
