@@ -395,6 +395,17 @@ adminEditWizard.action(/^edit_delete_(\d+)$/, async (ctx) => {
     return;
   }
 
+  // Block deletion of WORK_END if a subsequent shift exists
+  if (entry.type === TimeEntryType.WORK_END) {
+    const nextShift = await prisma.timeEntry.findFirst({
+      where: { employeeId: empId, type: TimeEntryType.WORK_START, timestamp: { gt: entry.timestamp } },
+    });
+    if (nextShift) {
+      await ctx.reply('⛔ Нельзя удалить конец смены: после неё уже начата следующая смена.');
+      return;
+    }
+  }
+
   const shiftEntries = await collectShiftEntries(empId, dateStr);
   const toDelete = getEntriesToDelete(shiftEntries, entryId);
   if (toDelete.length === 0) toDelete.push(entry as ShiftEntry);
