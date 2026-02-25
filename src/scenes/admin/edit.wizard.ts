@@ -99,13 +99,16 @@ async function showAddTypeMenu(
   const existingTypes = new Set(entries.map((e) => e.type));
   const prevTypes = new Set(prevDayEntries.map((e) => e.type));
 
-  // If today already has WORK_END without WORK_START, the cross-midnight shift is already closed
+  // If today already has WORK_END without WORK_START, the cross-midnight shift closed here
   const todayHasCrossMidnightEnd =
     existingTypes.has(TimeEntryType.WORK_END) && !existingTypes.has(TimeEntryType.WORK_START);
   const prevDayShiftOpen =
     prevTypes.has(TimeEntryType.WORK_START) &&
     !prevTypes.has(TimeEntryType.WORK_END) &&
     !todayHasCrossMidnightEnd;
+  // Cross-midnight shift closed today: prev day had WORK_START, today has WORK_END
+  const crossMidnightShiftWasActive =
+    todayHasCrossMidnightEnd && prevTypes.has(TimeEntryType.WORK_START);
 
   const SINGLE_USE: TimeEntryType[] = [
     TimeEntryType.WORK_START, TimeEntryType.WORK_END,
@@ -119,8 +122,9 @@ async function showAddTypeMenu(
   const onLeave =
     totalCount(TimeEntryType.PERSONAL_LEAVE_START) > totalCount(TimeEntryType.PERSONAL_LEAVE_END);
 
-  // Cross-midnight: treat as if shift has already started
-  const effectiveWorkStarted = existingTypes.has(TimeEntryType.WORK_START) || prevDayShiftOpen;
+  // Treat shift as started if: today has WORK_START, prev shift is open, or cross-midnight closed today
+  const effectiveWorkStarted =
+    existingTypes.has(TimeEntryType.WORK_START) || prevDayShiftOpen || crossMidnightShiftWasActive;
 
   const rows = Object.entries(TYPE_LABELS).map(([type, label]) => {
     const t = type as TimeEntryType;
@@ -129,7 +133,7 @@ async function showAddTypeMenu(
     const alreadyDone =
       SINGLE_USE.includes(t) &&
       (existingTypes.has(t) ||
-        (prevDayShiftOpen &&
+        ((prevDayShiftOpen || crossMidnightShiftWasActive) &&
           prevTypes.has(t) &&
           t !== TimeEntryType.WORK_START &&
           t !== TimeEntryType.WORK_END));
