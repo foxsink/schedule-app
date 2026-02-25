@@ -71,6 +71,32 @@ async function showEntriesList(ctx: BotContext, employeeId: number, date: Date):
   await ctx.reply(lines.join('\n'), { parse_mode: 'Markdown', ...keyboard });
 }
 
+/** Collects all entries belonging to the same shift, sorted by timestamp.
+ *  Handles cross-midnight shifts: if today has WORK_START but no WORK_END,
+ *  also fetches next-day entries; if today has WORK_END but no WORK_START,
+ *  also fetches prev-day entries. */
+async function collectShiftEntries(
+  employeeId: number,
+  dateStr: string,
+): Promise<Array<{ id: number; type: TimeEntryType; timestamp: Date }>> {
+  const date = new Date(`${dateStr}T00:00:00.000Z`);
+  const dayEntries = await prisma.timeEntry.findMany({ where: { employeeId, date } });
+  const types = new Set(dayEntries.map((e) => e.type));
+
+  let extra: typeof dayEntries = [];
+  if (types.has(TimeEntryType.WORK_START) && !types.has(TimeEntryType.WORK_END)) {
+    // Cross-midnight: shift started today, may end tomorrow
+    const nextDate = new Date(date.getTime() + 86_400_000);
+    extra = await prisma.timeEntry.findMany({ where: { employeeId, date: nextDate } });
+  } else if (types.has(TimeEntryType.WORK_END) && !types.has(TimeEntryType.WORK_START)) {
+    // Viewing the end-day of a cross-midnight shift
+    const prevDate = new Date(date.getTime() - 86_400_000);
+    extra = await prisma.timeEntry.findMany({ where: { employeeId, date: prevDate } });
+  }
+
+  return [...dayEntries, ...extra].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+}
+
 async function showEntryActions(ctx: BotContext, entryId: number): Promise<void> {
   const entry = await prisma.timeEntry.findUnique({ where: { id: entryId } });
   if (!entry) {
@@ -320,8 +346,40 @@ adminEditWizard.action(/^edit_change_(\d+)$/, async (ctx) => {
   );
 });
 
-// Delete entry
+// Delete entry — show confirmation with list of affected entries
 adminEditWizard.action(/^edit_delete_(\d+)$/, async (ctx) => {
+  await ctx.answerCbQuery();
+  const empId = ctx.scene.session.selectedEmployeeId;
+  const dateStr = ctx.scene.session.selectedPeriodFrom;
+  if (!empId || !dateStr) return ctx.scene.leave();
+  const entryId = parseInt(ctx.match[1], 10);
+  const date = new Date(`${dateStr}T00:00:00.000Z`);
+
+  const entry = await prisma.timeEntry.findUnique({ where: { id: entryId } });
+  if (!entry) {
+    await ctx.reply('Запись не найдена.');
+    await showEntriesList(ctx, empId, date);
+    return;
+  }
+
+  const shiftEntries = await collectShiftEntries(empId, dateStr);
+  const idx = shiftEntries.findIndex((e) => e.id === entryId);
+  const toDelete = idx >= 0 ? shiftEntries.slice(idx) : [entry];
+
+  const listLines = toDelete.map((e, i) => `${i + 1}. ${formatTime(e.timestamp)} — ${TYPE_LABELS[e.type]}`);
+  const warning =
+    toDelete.length > 1
+      ? `⚠️ Будут удалены эта и все последующие записи смены:\n\n${listLines.join('\n')}\n\nПродолжить?`
+      : `⚠️ Будет удалена запись:\n\n${listLines[0]}\n\nПродолжить?`;
+
+  await ctx.reply(warning, Markup.inlineKeyboard([
+    [Markup.button.callback('🗑 Удалить', `edit_delete_confirm_${entryId}`)],
+    [Markup.button.callback('✗ Отмена', 'edit_back_to_list')],
+  ]));
+});
+
+// Delete entry — confirmed
+adminEditWizard.action(/^edit_delete_confirm_(\d+)$/, async (ctx) => {
   await ctx.answerCbQuery();
   const editorId = ctx.employee?.id;
   const empId = ctx.scene.session.selectedEmployeeId;
@@ -337,46 +395,15 @@ adminEditWizard.action(/^edit_delete_(\d+)$/, async (ctx) => {
     return;
   }
 
-  const allEntries = await timeEntryService.getEntriesByDate(empId, date);
+  const shiftEntries = await collectShiftEntries(empId, dateStr);
+  const idx = shiftEntries.findIndex((e) => e.id === entryId);
+  const toDelete = idx >= 0 ? shiftEntries.slice(idx) : [entry];
 
-  if (entry.type === TimeEntryType.WORK_START) {
-    // Delete all entries for the day
-    for (const e of allEntries) {
-      await timeEntryService.deleteEntry(editorId, e.id);
-    }
-    await ctx.reply('🗑 Начало дня удалено — все записи за этот день удалены.');
-  } else if (entry.type === TimeEntryType.LUNCH_START) {
-    // Delete lunch end too if present
-    const lunchEnd = allEntries.find((e) => e.type === TimeEntryType.LUNCH_END);
-    await timeEntryService.deleteEntry(editorId, entryId);
-    if (lunchEnd) {
-      await timeEntryService.deleteEntry(editorId, lunchEnd.id);
-      await ctx.reply('🗑 Обед и конец обеда удалены.');
-    } else {
-      await ctx.reply('🗑 Запись удалена.');
-    }
-  } else if (entry.type === TimeEntryType.PERSONAL_LEAVE_START) {
-    // Find corresponding PERSONAL_LEAVE_END by index
-    const leaveStarts = allEntries
-      .filter((e) => e.type === TimeEntryType.PERSONAL_LEAVE_START)
-      .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
-    const leaveEnds = allEntries
-      .filter((e) => e.type === TimeEntryType.PERSONAL_LEAVE_END)
-      .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
-    const idx = leaveStarts.findIndex((e) => e.id === entryId);
-    const correspondingEnd = idx >= 0 && idx < leaveEnds.length ? leaveEnds[idx] : null;
-    await timeEntryService.deleteEntry(editorId, entryId);
-    if (correspondingEnd) {
-      await timeEntryService.deleteEntry(editorId, correspondingEnd.id);
-      await ctx.reply('🗑 Отлучка и возврат удалены.');
-    } else {
-      await ctx.reply('🗑 Запись удалена.');
-    }
-  } else {
-    await timeEntryService.deleteEntry(editorId, entryId);
-    await ctx.reply('🗑 Запись удалена.');
+  for (const e of toDelete) {
+    await timeEntryService.deleteEntry(editorId, e.id);
   }
 
+  await ctx.reply(toDelete.length > 1 ? `🗑 Удалено записей: ${toDelete.length}.` : '🗑 Запись удалена.');
   await showEntriesList(ctx, empId, date);
 });
 
