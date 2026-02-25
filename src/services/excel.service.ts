@@ -83,11 +83,20 @@ export const excelService = {
     detailHeaderRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } };
 
     for (const result of results) {
-      // Index adjustments by date for fast lookup
+      // Sorted list of shift day dates for fallback lookup
+      const dayDates = result.days.map((d) => d.date).sort();
+
+      // Index adjustments by date. If adjustment date has no matching shift day,
+      // attach it to the closest preceding shift day (or the first day if none precede it).
       const adjByDate = new Map<string, { bonuses: number; penalties: number }>();
       for (const a of result.adjustments) {
-        if (!adjByDate.has(a.date)) adjByDate.set(a.date, { bonuses: 0, penalties: 0 });
-        const entry = adjByDate.get(a.date)!;
+        let targetDate = a.date;
+        if (dayDates.length > 0 && !dayDates.includes(targetDate)) {
+          const preceding = dayDates.filter((d) => d <= a.date);
+          targetDate = preceding.length > 0 ? preceding[preceding.length - 1] : dayDates[0];
+        }
+        if (!adjByDate.has(targetDate)) adjByDate.set(targetDate, { bonuses: 0, penalties: 0 });
+        const entry = adjByDate.get(targetDate)!;
         if (a.type === 'BONUS') entry.bonuses += a.amount;
         else entry.penalties += a.amount;
       }
