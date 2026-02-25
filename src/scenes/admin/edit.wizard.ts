@@ -202,12 +202,20 @@ function validateEntryTime(
   }
 
   if (type === TimeEntryType.PERSONAL_LEAVE_END) {
-    // Positional pairing: leaveStarts[i] pairs with leaveEnds[i].
-    // The first chronologically unmatched start is the one needing its end next.
-    const leaveStarts = sorted.filter((e) => e.type === TimeEntryType.PERSONAL_LEAVE_START);
-    const leaveEnds = sorted.filter((e) => e.type === TimeEntryType.PERSONAL_LEAVE_END);
-    if (leaveStarts.length <= leaveEnds.length) return 'Нет открытой отлучки.';
-    const unclosed = leaveStarts[leaveEnds.length];
+    // LIFO matching: each END closes the most recently opened preceding START.
+    // Then the EARLIEST remaining unclosed start is the one needing its end next.
+    // This handles cases like [START(13:00), START(14:00), END(14:30)] where END closes
+    // START(14:00), leaving START(13:00) as the actual unclosed one.
+    const leaveEvents = sorted.filter(
+      (e) => e.type === TimeEntryType.PERSONAL_LEAVE_START || e.type === TimeEntryType.PERSONAL_LEAVE_END,
+    );
+    const openStack: ShiftEntry[] = [];
+    for (const e of leaveEvents) {
+      if (e.type === TimeEntryType.PERSONAL_LEAVE_START) openStack.push(e);
+      else openStack.pop(); // LIFO: END closes most recent preceding START
+    }
+    if (openStack.length === 0) return 'Нет открытой отлучки.';
+    const unclosed = openStack[0]; // earliest unclosed start
     if (T < unclosed.timestamp.getTime()) return 'Возврат должен быть не раньше начала отлучки.';
     const nextEvt = sorted.find((e) => e.timestamp.getTime() > unclosed.timestamp.getTime());
     if (nextEvt && T > nextEvt.timestamp.getTime()) {
