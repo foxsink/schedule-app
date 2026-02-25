@@ -58,8 +58,15 @@ async function showSalaryForPeriod(ctx: BotContext, from: Date, to: Date): Promi
     ctx.scene.session.selectedPeriodFrom = from.toISOString().slice(0, 10);
     ctx.scene.session.selectedPeriodTo = to.toISOString().slice(0, 10);
 
+    const adjDeleteRows = result.adjustments.map((a) => {
+      const sign = a.type === 'BONUS' ? '🎁 +' : '⚠️ −';
+      const dateObj = new Date(`${a.date}T00:00:00.000Z`);
+      return [Markup.button.callback(`🗑 ${sign}${a.amount} руб (${formatDate(dateObj)})`, `sal_del_adj_${a.id}`)];
+    });
+
     const keyboard = Markup.inlineKeyboard([
       [Markup.button.callback('🎁 Добавить премию', `sal_bonus_${empId}`), Markup.button.callback('⚠️ Добавить штраф', `sal_penalty_${empId}`)],
+      ...adjDeleteRows,
       [Markup.button.callback('« Назад', 'sal_back')],
     ]);
     await ctx.reply(formatSalaryResult(result), { parse_mode: 'Markdown', ...keyboard });
@@ -334,6 +341,57 @@ adminSalaryWizard.action('sal_adj_date_custom', async (ctx) => {
     'Введите дату (ДД.ММ.ГГ):',
     Markup.inlineKeyboard([[Markup.button.callback('✗ Отмена', 'sal_cancel_input'), Markup.button.callback('📋 Меню', 'go_menu')]]),
   );
+});
+
+adminSalaryWizard.action(/^sal_del_adj_(\d+)$/, async (ctx) => {
+  await ctx.answerCbQuery();
+  const adjId = parseInt(ctx.match[1], 10);
+  const adj = await prisma.salaryAdjustment.findUnique({ where: { id: adjId } });
+  if (!adj) {
+    await ctx.reply('Корректировка не найдена.');
+    return;
+  }
+  const sign = adj.type === 'BONUS' ? '🎁 Премия +' : '⚠️ Штраф −';
+  const dateObj = new Date(adj.date);
+  await ctx.reply(
+    `Удалить корректировку?\n\n${sign}${Number(adj.amount)} руб\nДата: ${formatDate(dateObj)}\nПричина: ${adj.reason}`,
+    Markup.inlineKeyboard([
+      [Markup.button.callback('🗑 Удалить', `sal_del_adj_confirm_${adjId}`)],
+      [Markup.button.callback('✗ Отмена', 'sal_cancel_del')],
+    ]),
+  );
+});
+
+adminSalaryWizard.action(/^sal_del_adj_confirm_(\d+)$/, async (ctx) => {
+  await ctx.answerCbQuery();
+  const editorId = ctx.employee?.id;
+  if (!editorId) return ctx.scene.leave();
+  const adjId = parseInt(ctx.match[1], 10);
+  const adj = await prisma.salaryAdjustment.findUnique({ where: { id: adjId } });
+  if (!adj) {
+    await ctx.reply('Корректировка не найдена.');
+  } else {
+    await salaryService.deleteAdjustment(adjId);
+    await auditService.log(editorId, AuditAction.DELETE, AuditEntityType.SALARY_ADJUSTMENT, adjId, { employeeId: adj.employeeId, type: adj.type, amount: Number(adj.amount), reason: adj.reason }, null);
+    const label = adj.type === 'BONUS' ? 'Премия' : 'Штраф';
+    await ctx.reply(`🗑 ${label} удалён.`);
+  }
+  const empId = ctx.scene.session.selectedEmployeeId;
+  const fromStr = ctx.scene.session.selectedPeriodFrom;
+  const toStr = ctx.scene.session.selectedPeriodTo;
+  if (empId && fromStr && toStr) {
+    await showSalaryForPeriod(ctx, new Date(`${fromStr}T00:00:00.000Z`), new Date(`${toStr}T00:00:00.000Z`));
+  }
+});
+
+adminSalaryWizard.action('sal_cancel_del', async (ctx) => {
+  await ctx.answerCbQuery();
+  const empId = ctx.scene.session.selectedEmployeeId;
+  const fromStr = ctx.scene.session.selectedPeriodFrom;
+  const toStr = ctx.scene.session.selectedPeriodTo;
+  if (empId && fromStr && toStr) {
+    await showSalaryForPeriod(ctx, new Date(`${fromStr}T00:00:00.000Z`), new Date(`${toStr}T00:00:00.000Z`));
+  }
 });
 
 adminSalaryWizard.action('sal_back', async (ctx) => {

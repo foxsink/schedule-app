@@ -16,6 +16,7 @@ export interface DaySalary {
 }
 
 export interface AdjustmentItem {
+  id: number;
   type: AdjustmentType;
   amount: number;
   date: string;
@@ -200,6 +201,7 @@ export const salaryService = {
       lastName: employee.lastName,
       days,
       adjustments: adjustments.map((a) => ({
+        id: a.id,
         type: a.type,
         amount: Number(a.amount),
         date: a.date.toISOString().slice(0, 10),
@@ -223,5 +225,9 @@ export const salaryService = {
     return prisma.salaryAdjustment.create({
       data: { employeeId, type, amount, date, reason },
     });
+  },
+
+  async deleteAdjustment(id: number) {
+    return prisma.salaryAdjustment.delete({ where: { id } });
   },
 };
