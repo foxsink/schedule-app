@@ -36,7 +36,8 @@ export const timeEntryService = {
     const has = (t: TimeEntryType) => types.includes(t);
 
     if (has(TimeEntryType.SICK_LEAVE)) return [];
-    if (has(TimeEntryType.WORK_END)) return [];
+    // Cross-midnight: today has WORK_END but no WORK_START — shift ended from yesterday, allow new shift
+    if (has(TimeEntryType.WORK_END) && has(TimeEntryType.WORK_START)) return [];
 
     if (!has(TimeEntryType.WORK_START)) {
       // Check if previous day's shift is still open (cross-midnight)
