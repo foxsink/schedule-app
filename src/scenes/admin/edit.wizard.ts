@@ -129,14 +129,17 @@ async function showAddTypeMenu(
   const rows = Object.entries(TYPE_LABELS).map(([type, label]) => {
     const t = type as TimeEntryType;
     const noWorkStart = !effectiveWorkStarted;
-    // Cross-midnight: prev day's completed single-use types count as ✅ (except WORK_START/WORK_END)
+    // Cross-midnight: prev day's single-use types count as ✅ done (except WORK_START/WORK_END/LUNCH)
+    // LUNCH_START and LUNCH_END are excluded: their state is driven by onLunch/lunchEndBlocked
     const alreadyDone =
       SINGLE_USE.includes(t) &&
       (existingTypes.has(t) ||
         ((prevDayShiftOpen || crossMidnightShiftWasActive) &&
           prevTypes.has(t) &&
           t !== TimeEntryType.WORK_START &&
-          t !== TimeEntryType.WORK_END));
+          t !== TimeEntryType.WORK_END &&
+          t !== TimeEntryType.LUNCH_START &&
+          t !== TimeEntryType.LUNCH_END));
     const requiresWorkStart = noWorkStart && t !== TimeEntryType.WORK_START && t !== TimeEntryType.SICK_LEAVE;
     // Block work_start if previous day's shift is still open
     const workStartCrossMidnight =
