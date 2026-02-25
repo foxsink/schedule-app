@@ -56,12 +56,13 @@ export function msToHoursStr(ms: number): string {
 export const reportService = {
   async getDaySchedule(date?: Date): Promise<DayScheduleEntry[]> {
     const targetDate = date ?? todayDateUTC7();
+    const yesterday = new Date(targetDate.getTime() - 86_400_000);
 
     const employees = await prisma.employee.findMany({
       where: { isActive: true },
       include: {
         timeEntries: {
-          where: { date: targetDate },
+          where: { date: { in: [yesterday, targetDate] } },
           orderBy: { timestamp: 'asc' },
         },
       },
@@ -69,30 +70,77 @@ export const reportService = {
     });
 
     return employees.map((emp) => {
-      const entries = emp.timeEntries;
-      const types = entries.map((e) => e.type);
-      const get = (type: TimeEntryType) => entries.find((e) => e.type === type);
+      const todayEntries = emp.timeEntries.filter((e) => e.date.getTime() === targetDate.getTime());
+      const prevEntries = emp.timeEntries.filter((e) => e.date.getTime() === yesterday.getTime());
+
+      const types = todayEntries.map((e) => e.type);
+      const prevTypes = prevEntries.map((e) => e.type);
+      const get = (type: TimeEntryType) => todayEntries.find((e) => e.type === type);
+      const getP = (type: TimeEntryType) => prevEntries.find((e) => e.type === type);
+
+      // Cross-midnight: yesterday had WORK_START, no WORK_END; today has WORK_END without WORK_START
+      const crossMidnightEnd =
+        types.includes(TimeEntryType.WORK_END) &&
+        !types.includes(TimeEntryType.WORK_START) &&
+        prevTypes.includes(TimeEntryType.WORK_START) &&
+        !prevTypes.includes(TimeEntryType.WORK_END);
+
+      // Cross-midnight: yesterday shift still open (no WORK_END recorded yet)
+      const crossMidnightOpen =
+        !types.includes(TimeEntryType.WORK_START) &&
+        !types.includes(TimeEntryType.WORK_END) &&
+        prevTypes.includes(TimeEntryType.WORK_START) &&
+        !prevTypes.includes(TimeEntryType.WORK_END);
 
       let status: EmployeeStatus;
 
       if (types.includes(TimeEntryType.SICK_LEAVE)) {
         status = { kind: 'sick' };
-      } else if (types.includes(TimeEntryType.WORK_END)) {
-        const workStart = get(TimeEntryType.WORK_START)!;
+      } else if (crossMidnightEnd) {
+        // Shift ended this morning; WORK_START is from yesterday
+        const workStart = getP(TimeEntryType.WORK_START)!;
         const workEnd = get(TimeEntryType.WORK_END)!;
-        const ms = calcMs(entries);
+        const allEntries = [...prevEntries, ...todayEntries];
+        const ms = calcMs(allEntries);
         status = {
           kind: 'done',
           start: formatTime(workStart.timestamp),
           end: formatTime(workEnd.timestamp),
           hours: msToHoursStr(ms),
         };
+      } else if (types.includes(TimeEntryType.WORK_END)) {
+        const workStart = get(TimeEntryType.WORK_START)!;
+        const workEnd = get(TimeEntryType.WORK_END)!;
+        const ms = calcMs(todayEntries);
+        status = {
+          kind: 'done',
+          start: formatTime(workStart.timestamp),
+          end: formatTime(workEnd.timestamp),
+          hours: msToHoursStr(ms),
+        };
+      } else if (crossMidnightOpen) {
+        // Shift started yesterday, still ongoing
+        const allEntries = [...prevEntries, ...todayEntries];
+        const allTypes = allEntries.map((e) => e.type);
+        if (allTypes.includes(TimeEntryType.LUNCH_START) && !allTypes.includes(TimeEntryType.LUNCH_END)) {
+          const ls = allEntries.find((e) => e.type === TimeEntryType.LUNCH_START)!;
+          status = { kind: 'lunch', since: formatTime(ls.timestamp) };
+        } else {
+          const plStarts = allEntries.filter((e) => e.type === TimeEntryType.PERSONAL_LEAVE_START);
+          const plEnds = allEntries.filter((e) => e.type === TimeEntryType.PERSONAL_LEAVE_END);
+          if (plStarts.length > plEnds.length) {
+            status = { kind: 'personal_leave', since: formatTime(plStarts[plStarts.length - 1].timestamp) };
+          } else {
+            const ws = getP(TimeEntryType.WORK_START)!;
+            status = { kind: 'working', since: formatTime(ws.timestamp) };
+          }
+        }
       } else if (types.includes(TimeEntryType.LUNCH_START) && !types.includes(TimeEntryType.LUNCH_END)) {
         const ls = get(TimeEntryType.LUNCH_START)!;
         status = { kind: 'lunch', since: formatTime(ls.timestamp) };
       } else if (types.includes(TimeEntryType.PERSONAL_LEAVE_START)) {
-        const plStarts = entries.filter((e) => e.type === TimeEntryType.PERSONAL_LEAVE_START);
-        const plEnds = entries.filter((e) => e.type === TimeEntryType.PERSONAL_LEAVE_END);
+        const plStarts = todayEntries.filter((e) => e.type === TimeEntryType.PERSONAL_LEAVE_START);
+        const plEnds = todayEntries.filter((e) => e.type === TimeEntryType.PERSONAL_LEAVE_END);
         if (plStarts.length > plEnds.length) {
           status = { kind: 'personal_leave', since: formatTime(plStarts[plStarts.length - 1].timestamp) };
         } else {
