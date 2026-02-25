@@ -48,7 +48,9 @@ async function showEmployeeList(ctx: BotContext): Promise<void> {
   await ctx.reply('Выберите сотрудника для расчёта зарплаты:', Markup.inlineKeyboard(rows));
 }
 
-async function showSalaryForPeriod(ctx: BotContext, from: Date, to: Date): Promise<void> {
+const ADJ_PAGE_SIZE = 5;
+
+async function showSalaryForPeriod(ctx: BotContext, from: Date, to: Date, adjPage = 0): Promise<void> {
   const empId = ctx.scene.session.selectedEmployeeId;
   const editorId = ctx.employee?.id;
   if (!editorId) return;
@@ -58,15 +60,26 @@ async function showSalaryForPeriod(ctx: BotContext, from: Date, to: Date): Promi
     ctx.scene.session.selectedPeriodFrom = from.toISOString().slice(0, 10);
     ctx.scene.session.selectedPeriodTo = to.toISOString().slice(0, 10);
 
-    const adjDeleteRows = result.adjustments.map((a) => {
+    const totalAdj = result.adjustments.length;
+    const totalPages = Math.ceil(totalAdj / ADJ_PAGE_SIZE);
+    const safePage = Math.min(adjPage, Math.max(0, totalPages - 1));
+    const pageAdjs = result.adjustments.slice(safePage * ADJ_PAGE_SIZE, (safePage + 1) * ADJ_PAGE_SIZE);
+
+    const adjDeleteRows = pageAdjs.map((a) => {
       const sign = a.type === 'BONUS' ? '🎁 +' : '⚠️ −';
       const dateObj = new Date(`${a.date}T00:00:00.000Z`);
       return [Markup.button.callback(`🗑 ${sign}${a.amount} руб (${formatDate(dateObj)})`, `sal_del_adj_${a.id}`)];
     });
 
+    const navRow: ReturnType<typeof Markup.button.callback>[] = [];
+    if (safePage > 0) navRow.push(Markup.button.callback('◀️', `sal_adj_page_${safePage - 1}`));
+    if (totalPages > 1) navRow.push(Markup.button.callback(`${safePage + 1} / ${totalPages}`, 'noop'));
+    if (safePage < totalPages - 1) navRow.push(Markup.button.callback('▶️', `sal_adj_page_${safePage + 1}`));
+
     const keyboard = Markup.inlineKeyboard([
       [Markup.button.callback('🎁 Добавить премию', `sal_bonus_${empId}`), Markup.button.callback('⚠️ Добавить штраф', `sal_penalty_${empId}`)],
       ...adjDeleteRows,
+      ...(navRow.length > 0 ? [navRow] : []),
       [Markup.button.callback('« Назад', 'sal_back')],
     ]);
     await ctx.reply(formatSalaryResult(result), { parse_mode: 'Markdown', ...keyboard });
@@ -382,6 +395,16 @@ adminSalaryWizard.action(/^sal_del_adj_confirm_(\d+)$/, async (ctx) => {
   if (empId && fromStr && toStr) {
     await showSalaryForPeriod(ctx, new Date(`${fromStr}T00:00:00.000Z`), new Date(`${toStr}T00:00:00.000Z`));
   }
+});
+
+adminSalaryWizard.action(/^sal_adj_page_(\d+)$/, async (ctx) => {
+  await ctx.answerCbQuery();
+  const page = parseInt(ctx.match[1], 10);
+  const empId = ctx.scene.session.selectedEmployeeId;
+  const fromStr = ctx.scene.session.selectedPeriodFrom;
+  const toStr = ctx.scene.session.selectedPeriodTo;
+  if (!empId || !fromStr || !toStr) return;
+  await showSalaryForPeriod(ctx, new Date(`${fromStr}T00:00:00.000Z`), new Date(`${toStr}T00:00:00.000Z`), page);
 });
 
 adminSalaryWizard.action('sal_cancel_del', async (ctx) => {
