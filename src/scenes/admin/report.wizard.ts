@@ -144,17 +144,20 @@ export const adminReportWizard = new Scenes.WizardScene<BotContext>(
   ADMIN_REPORT_SCENE_ID,
 
   // Step 0: handles text while cursor=0 (user should use buttons)
-  async (ctx) => {
+  async (ctx, next) => {
+    if (ctx.callbackQuery) return next!();
     await ctx.reply('Пожалуйста, выберите сотрудника из списка кнопок.');
   },
 
   // Step 1: handles text while cursor=1 (user should use buttons)
-  async (ctx) => {
+  async (ctx, next) => {
+    if (ctx.callbackQuery) return next!();
     await ctx.reply('Пожалуйста, выберите период из предложенных вариантов.');
   },
 
   // Step 2: custom start date text input
-  async (ctx) => {
+  async (ctx, next) => {
+    if (ctx.callbackQuery) return next!();
     if (!ctx.message || !('text' in ctx.message)) {
       await ctx.reply('Введите дату начала в формате ДД.ММ.ГГ:');
       return;
@@ -176,7 +179,8 @@ export const adminReportWizard = new Scenes.WizardScene<BotContext>(
   },
 
   // Step 3: custom end date text input → show report
-  async (ctx) => {
+  async (ctx, next) => {
+    if (ctx.callbackQuery) return next!();
     if (!ctx.message || !('text' in ctx.message)) {
       await ctx.reply('Введите дату окончания в формате ДД.ММ.ГГ:');
       return;

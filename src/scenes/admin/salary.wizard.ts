@@ -80,13 +80,14 @@ export const adminSalaryWizard = new Scenes.WizardScene<BotContext>(
   ADMIN_SALARY_SCENE_ID,
 
   // Step 0: text while at employee list
-  async (ctx) => { await ctx.reply('Выберите сотрудника из списка.'); },
+  async (ctx, next) => { if (ctx.callbackQuery) return next!(); await ctx.reply('Выберите сотрудника из списка.'); },
 
   // Step 1: text while at period selection
-  async (ctx) => { await ctx.reply('Выберите период из предложенных вариантов.'); },
+  async (ctx, next) => { if (ctx.callbackQuery) return next!(); await ctx.reply('Выберите период из предложенных вариантов.'); },
 
   // Step 2: custom start date
-  async (ctx) => {
+  async (ctx, next) => {
+    if (ctx.callbackQuery) return next!();
     if (!ctx.message || !('text' in ctx.message)) { await ctx.reply('Введите дату начала (ДД.ММ.ГГ):'); return; }
     const date = parseDate(ctx.message.text);
     if (!date) {
@@ -105,7 +106,8 @@ export const adminSalaryWizard = new Scenes.WizardScene<BotContext>(
   },
 
   // Step 3: custom end date
-  async (ctx) => {
+  async (ctx, next) => {
+    if (ctx.callbackQuery) return next!();
     if (!ctx.message || !('text' in ctx.message)) { await ctx.reply('Введите дату окончания (ДД.ММ.ГГ):'); return; }
     const date = parseDate(ctx.message.text);
     if (!date) {
@@ -130,7 +132,8 @@ export const adminSalaryWizard = new Scenes.WizardScene<BotContext>(
   },
 
   // Step 4: adjustment input: "AMOUNT reason text"
-  async (ctx) => {
+  async (ctx, next) => {
+    if (ctx.callbackQuery) return next!();
     if (!ctx.message || !('text' in ctx.message)) { await ctx.reply('Введите сумму и причину (например: 1000 За хорошую работу):'); return; }
     const meta = ctx.scene.session.selectedDate;
     const editorId = ctx.employee?.id;

@@ -163,12 +163,14 @@ export const adminEditWizard = new Scenes.WizardScene<BotContext>(
   ADMIN_EDIT_SCENE_ID,
 
   // Step 0: text while at employee selection
-  async (ctx) => {
+  async (ctx, next) => {
+    if (ctx.callbackQuery) return next!();
     await ctx.reply('Выберите сотрудника из списка.');
   },
 
   // Step 1: date text input
-  async (ctx) => {
+  async (ctx, next) => {
+    if (ctx.callbackQuery) return next!();
     if (!ctx.message || !('text' in ctx.message)) {
       await showDateMenu(ctx);
       return;
@@ -189,7 +191,8 @@ export const adminEditWizard = new Scenes.WizardScene<BotContext>(
   },
 
   // Step 2: at entries list — text for new time when editing
-  async (ctx) => {
+  async (ctx, next) => {
+    if (ctx.callbackQuery) return next!();
     if (!ctx.message || !('text' in ctx.message)) {
       await ctx.reply('Введите время в формате ЧЧ:ММ:');
       return;

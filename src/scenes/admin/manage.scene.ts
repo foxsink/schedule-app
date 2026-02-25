@@ -77,12 +77,14 @@ export const adminManageScene = new Scenes.WizardScene<BotContext>(
   ADMIN_MANAGE_SCENE_ID,
 
   // Step 0: text while at list
-  async (ctx) => {
+  async (ctx, next) => {
+    if (ctx.callbackQuery) return next!();
     await ctx.reply('Выберите действие из списка.');
   },
 
   // Step 1: text input for various sub-flows
-  async (ctx) => {
+  async (ctx, next) => {
+    if (ctx.callbackQuery) return next!();
     if (!ctx.message || !('text' in ctx.message)) return;
     const meta = ctx.scene.session.selectedDate;
     const editorId = ctx.employee?.id;

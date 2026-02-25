@@ -135,12 +135,14 @@ export const historyScene = new Scenes.WizardScene<BotContext>(
   HISTORY_SCENE_ID,
 
   // Step 0: show period selector
-  async (ctx) => {
+  async (ctx, next) => {
+    if (ctx.callbackQuery) return next!();
     await ctx.reply('Выберите период:', PERIOD_KEYBOARD);
   },
 
   // Step 1: ask for start date (custom flow)
-  async (ctx) => {
+  async (ctx, next) => {
+    if (ctx.callbackQuery) return next!();
     if (!ctx.message || !('text' in ctx.message)) {
       await ctx.reply('Введите дату начала в формате ДД.ММ.ГГ:');
       return;
@@ -162,7 +164,8 @@ export const historyScene = new Scenes.WizardScene<BotContext>(
   },
 
   // Step 2: ask for end date, then show
-  async (ctx) => {
+  async (ctx, next) => {
+    if (ctx.callbackQuery) return next!();
     if (!ctx.message || !('text' in ctx.message)) {
       await ctx.reply('Введите дату окончания в формате ДД.ММ.ГГ:');
       return;

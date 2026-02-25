@@ -29,12 +29,14 @@ export const adminExportWizard = new Scenes.WizardScene<BotContext>(
   ADMIN_EXPORT_SCENE_ID,
 
   // Step 0: period selection (enter hook shows keyboard)
-  async (ctx) => {
+  async (ctx, next) => {
+    if (ctx.callbackQuery) return next!();
     await ctx.reply('Выберите период из предложенных вариантов.');
   },
 
   // Step 1: custom start date
-  async (ctx) => {
+  async (ctx, next) => {
+    if (ctx.callbackQuery) return next!();
     if (!ctx.message || !('text' in ctx.message)) { await ctx.reply('Введите дату начала (ДД.ММ.ГГ):'); return; }
     const date = parseDate(ctx.message.text);
     if (!date) {
@@ -53,7 +55,8 @@ export const adminExportWizard = new Scenes.WizardScene<BotContext>(
   },
 
   // Step 2: custom end date
-  async (ctx) => {
+  async (ctx, next) => {
+    if (ctx.callbackQuery) return next!();
     if (!ctx.message || !('text' in ctx.message)) { await ctx.reply('Введите дату окончания (ДД.ММ.ГГ):'); return; }
     const date = parseDate(ctx.message.text);
     if (!date) {
