@@ -112,6 +112,7 @@ function getEntriesToDelete(shiftEntries: ShiftEntry[], targetId: number): Shift
     TimeEntryType.PERSONAL_LEAVE_END,
     TimeEntryType.LUNCH_START,
     TimeEntryType.LUNCH_END,
+    TimeEntryType.WORK_END,
   ];
   if (PAIRED_TYPES.includes(target.type)) {
     if (target.type === TimeEntryType.PERSONAL_LEAVE_START || target.type === TimeEntryType.LUNCH_START) {
@@ -122,7 +123,7 @@ function getEntriesToDelete(shiftEntries: ShiftEntry[], targetId: number): Shift
       const closingEntry = shiftEntries.slice(idx + 1).find((e) => e.type === endType);
       return closingEntry ? [target, closingEntry] : [target];
     }
-    // PERSONAL_LEAVE_END / LUNCH_END — delete only this entry
+    // PERSONAL_LEAVE_END / LUNCH_END / WORK_END — delete only this entry
     return [target];
   }
 
