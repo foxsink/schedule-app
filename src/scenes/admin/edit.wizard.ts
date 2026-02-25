@@ -238,6 +238,33 @@ async function showEntryActions(ctx: BotContext, entryId: number): Promise<void>
   );
 }
 
+// Types handled atomically in the pair flow — not shown as separate "add" items
+const PAIR_END_TYPES = new Set<TimeEntryType>([TimeEntryType.LUNCH_END, TimeEntryType.PERSONAL_LEAVE_END]);
+
+/** Shows the prompt asking the admin to enter the END time of a lunch/absence pair. */
+async function showPairEndPrompt(ctx: BotContext, endType: TimeEntryType, startTimestamp: Date, isToday: boolean): Promise<void> {
+  const isLunch = endType === TimeEntryType.LUNCH_END;
+  const label = isLunch ? 'обеда' : 'отлучки';
+  const returnLabel = isLunch ? 'окончания' : 'возврата';
+  const buttons: ReturnType<typeof Markup.button.callback>[][] = [];
+  if (isLunch) {
+    const t30 = new Date(startTimestamp.getTime() + 30 * 60_000);
+    const t60 = new Date(startTimestamp.getTime() + 60 * 60_000);
+    buttons.push([
+      Markup.button.callback(`+30 мин (${formatTime(t30)})`, 'edit_lunch_end_30'),
+      Markup.button.callback(`+1 час (${formatTime(t60)})`, 'edit_lunch_end_60'),
+    ]);
+  }
+  if (isToday) {
+    buttons.push([Markup.button.callback(`🕐 Сейчас (${formatTime(new Date())})`, 'edit_time_now')]);
+  }
+  buttons.push([Markup.button.callback('✗ Отмена', 'edit_cancel_input'), Markup.button.callback('📋 Меню', 'go_menu')]);
+  await ctx.reply(
+    `Начало ${label} — *${formatTime(startTimestamp)}*. Введите время ${returnLabel} (ЧЧ:ММ):`,
+    { parse_mode: 'Markdown', ...Markup.inlineKeyboard(buttons) },
+  );
+}
+
 async function showAddTypeMenu(
   ctx: BotContext,
   entries: Array<{ type: TimeEntryType }>,
@@ -277,7 +304,7 @@ async function showAddTypeMenu(
   const effectiveWorkStarted =
     existingTypes.has(TimeEntryType.WORK_START) || prevDayShiftOpen;
 
-  const rows = Object.entries(TYPE_LABELS).map(([type, label]) => {
+  const rows = Object.entries(TYPE_LABELS).filter(([type]) => !PAIR_END_TYPES.has(type as TimeEntryType)).map(([type, label]) => {
     const t = type as TimeEntryType;
     const noWorkStart = !effectiveWorkStarted;
     // Cross-midnight: prev day's single-use types count as ✅ done (except WORK_START/WORK_END/LUNCH)
@@ -367,7 +394,8 @@ export const adminEditWizard = new Scenes.WizardScene<BotContext>(
     const editorId = ctx.employee?.id;
     if (!editorId) return ctx.scene.leave();
 
-    // selectedDate stores "eid:N" for edit, "add:TYPE" for add
+    // selectedDate stores "eid:N" for edit, "add:TYPE" for add,
+    // "pair_start:TYPE" / "pair_end:TYPE" for the two-step lunch/absence flow
     const meta = ctx.scene.session.selectedDate;
     const dateStr = ctx.scene.session.selectedPeriodFrom;
     const empId = ctx.scene.session.selectedEmployeeId;
@@ -375,6 +403,51 @@ export const adminEditWizard = new Scenes.WizardScene<BotContext>(
 
     const date = new Date(`${dateStr}T00:00:00.000Z`);
     const timestamp = localInputToUtc(dateStr, parsed.hours, parsed.minutes);
+    const backButtons = Markup.inlineKeyboard([[Markup.button.callback('✗ Отмена', 'edit_cancel_input'), Markup.button.callback('📋 Меню', 'go_menu')]]);
+
+    if (meta.startsWith('pair_start:')) {
+      const startType = meta.slice('pair_start:'.length) as TimeEntryType;
+      const shiftEntries = await collectShiftEntries(empId, dateStr);
+      const validationError = validateEntryTime(startType, timestamp, shiftEntries);
+      if (validationError) {
+        await ctx.reply(`❌ ${validationError}\n\nВведите другое время:`, backButtons);
+        return;
+      }
+      ctx.scene.session.pendingStartTime = timestamp.toISOString();
+      const endType = startType === TimeEntryType.LUNCH_START ? TimeEntryType.LUNCH_END : TimeEntryType.PERSONAL_LEAVE_END;
+      ctx.scene.session.selectedDate = `pair_end:${endType}`;
+      const isToday = dateStr === todayDateUTC7().toISOString().slice(0, 10);
+      await showPairEndPrompt(ctx, endType, timestamp, isToday);
+      return;
+    }
+
+    if (meta.startsWith('pair_end:')) {
+      const endType = meta.slice('pair_end:'.length) as TimeEntryType;
+      const startType = endType === TimeEntryType.LUNCH_END ? TimeEntryType.LUNCH_START : TimeEntryType.PERSONAL_LEAVE_START;
+      const pendingStartStr = ctx.scene.session.pendingStartTime;
+      if (!pendingStartStr) return ctx.scene.leave();
+      const startTimestamp = new Date(pendingStartStr);
+
+      if (timestamp <= startTimestamp) {
+        await ctx.reply(`❌ Время окончания должно быть позже начала (${formatTime(startTimestamp)}).\n\nВведите другое время:`, backButtons);
+        return;
+      }
+      const shiftEntries = await collectShiftEntries(empId, dateStr);
+      const virtualStart = { id: -999, type: startType, timestamp: startTimestamp };
+      const validationError = validateEntryTime(endType, timestamp, [...shiftEntries, virtualStart]);
+      if (validationError) {
+        await ctx.reply(`❌ ${validationError}\n\nВведите другое время:`, backButtons);
+        return;
+      }
+      await timeEntryService.createEntryManual(editorId, empId, startType, startTimestamp, date);
+      await timeEntryService.createEntryManual(editorId, empId, endType, timestamp, date);
+      const actionLabel = startType === TimeEntryType.LUNCH_START ? 'Обед' : 'Отлучка';
+      await ctx.reply(`✅ ${actionLabel} добавлен: ${formatTime(startTimestamp)} — ${formatTime(timestamp)}`);
+      ctx.scene.session.pendingStartTime = undefined;
+      ctx.scene.session.selectedDate = undefined;
+      await showEntriesList(ctx, empId, date);
+      return;
+    }
 
     if (meta.startsWith('eid:')) {
       const entryId = parseInt(meta.slice(4), 10);
@@ -592,30 +665,23 @@ adminEditWizard.action(/^edit_add_type_(.+)$/, async (ctx) => {
 
   const isToday = dateStr === todayDateUTC7().toISOString().slice(0, 10);
 
-  // Lunch end — offer quick options based on lunch start time
-  if (type === TimeEntryType.LUNCH_END) {
-    const date = new Date(`${dateStr}T00:00:00.000Z`);
-    const entries = await timeEntryService.getEntriesByDate(empId, date);
-    // entries already fetched, reused below
-    const lunchStart = entries.find((e) => e.type === TimeEntryType.LUNCH_START);
-    if (lunchStart) {
-      const t30 = new Date(lunchStart.timestamp.getTime() + 30 * 60_000);
-      const t60 = new Date(lunchStart.timestamp.getTime() + 60 * 60_000);
-      ctx.scene.session.selectedDate = `add:${type}`;
-      while (ctx.wizard.cursor < 2) ctx.wizard.next();
-      await ctx.reply(
-        `Введите время конца обеда или выберите:`,
-        Markup.inlineKeyboard([
-          [
-            Markup.button.callback(`+30 мин (${formatTime(t30)})`, 'edit_lunch_end_30'),
-            Markup.button.callback(`+1 час (${formatTime(t60)})`, 'edit_lunch_end_60'),
-          ],
+  // Lunch and absence — two-step pair flow: collect start, then end, save both atomically
+  if (type === TimeEntryType.LUNCH_START || type === TimeEntryType.PERSONAL_LEAVE_START) {
+    ctx.scene.session.pendingStartTime = undefined;
+    ctx.scene.session.selectedDate = `pair_start:${type}`;
+    while (ctx.wizard.cursor < 2) ctx.wizard.next();
+    const startLabel = type === TimeEntryType.LUNCH_START ? 'начала обеда' : 'начала отлучки';
+    await ctx.reply(
+      `Введите время *${startLabel}* (ЧЧ:ММ):`,
+      {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
           ...(isToday ? [[Markup.button.callback(`🕐 Сейчас (${formatTime(new Date())})`, 'edit_time_now')]] : []),
-          [Markup.button.callback('« Назад к списку', 'edit_cancel_input'), Markup.button.callback('📋 Меню', 'go_menu')],
+          [Markup.button.callback('✗ Отмена', 'edit_cancel_input'), Markup.button.callback('📋 Меню', 'go_menu')],
         ]),
-      );
-      return;
-    }
+      },
+    );
+    return;
   }
 
   ctx.scene.session.selectedDate = `add:${type}`;
@@ -634,26 +700,27 @@ adminEditWizard.action(/^edit_lunch_end_(30|60)$/, async (ctx) => {
   const editorId = ctx.employee?.id;
   const empId = ctx.scene.session.selectedEmployeeId;
   const dateStr = ctx.scene.session.selectedPeriodFrom;
-  if (!editorId || !empId || !dateStr) return ctx.scene.leave();
+  const pendingStartStr = ctx.scene.session.pendingStartTime;
+  if (!editorId || !empId || !dateStr || !pendingStartStr) return ctx.scene.leave();
   const date = new Date(`${dateStr}T00:00:00.000Z`);
-  const entries = await timeEntryService.getEntriesByDate(empId, date);
-  const lunchStart = entries.find((e) => e.type === TimeEntryType.LUNCH_START);
-  if (!lunchStart) return ctx.scene.leave();
+  const startTimestamp = new Date(pendingStartStr);
   const offsetMin = ctx.match[1] === '30' ? 30 : 60;
-  const timestamp = new Date(lunchStart.timestamp.getTime() + offsetMin * 60_000);
+  const endTimestamp = new Date(startTimestamp.getTime() + offsetMin * 60_000);
   const shiftEntries = await collectShiftEntries(empId, dateStr);
-  const validationError = validateEntryTime(TimeEntryType.LUNCH_END, timestamp, shiftEntries);
+  const virtualStart = { id: -999, type: TimeEntryType.LUNCH_START, timestamp: startTimestamp };
+  const validationError = validateEntryTime(TimeEntryType.LUNCH_END, endTimestamp, [...shiftEntries, virtualStart]);
   if (validationError) {
-    await ctx.reply(
-      `❌ ${validationError}\n\nВведите время вручную:`,
-      Markup.inlineKeyboard([[Markup.button.callback('« Назад к списку', 'edit_cancel_input'), Markup.button.callback('📋 Меню', 'go_menu')]]),
-    );
+    const isToday = dateStr === todayDateUTC7().toISOString().slice(0, 10);
+    await ctx.reply(`❌ ${validationError}\n\nВведите время вручную:`);
+    await showPairEndPrompt(ctx, TimeEntryType.LUNCH_END, startTimestamp, isToday);
     return;
   }
-  await timeEntryService.createEntryManual(editorId, empId, TimeEntryType.LUNCH_END, timestamp, date);
+  await timeEntryService.createEntryManual(editorId, empId, TimeEntryType.LUNCH_START, startTimestamp, date);
+  await timeEntryService.createEntryManual(editorId, empId, TimeEntryType.LUNCH_END, endTimestamp, date);
+  ctx.scene.session.pendingStartTime = undefined;
   ctx.scene.session.selectedDate = undefined;
   ctx.wizard.selectStep(2);
-  await ctx.reply(`✅ Запись добавлена: ${TYPE_LABELS[TimeEntryType.LUNCH_END]} в ${formatTime(timestamp)}`);
+  await ctx.reply(`✅ Обед добавлен: ${formatTime(startTimestamp)} — ${formatTime(endTimestamp)}`);
   await showEntriesList(ctx, empId, date);
 });
 
@@ -672,6 +739,51 @@ adminEditWizard.action('edit_time_now', async (ctx) => {
 
   const timestamp = new Date(); // actual UTC for storage
   const date = new Date(`${dateStr}T00:00:00.000Z`);
+
+  const backButtons = Markup.inlineKeyboard([[Markup.button.callback('✗ Отмена', 'edit_cancel_input'), Markup.button.callback('📋 Меню', 'go_menu')]]);
+
+  if (meta.startsWith('pair_start:')) {
+    const startType = meta.slice('pair_start:'.length) as TimeEntryType;
+    const shiftEntries = await collectShiftEntries(empId, dateStr);
+    const validationError = validateEntryTime(startType, timestamp, shiftEntries);
+    if (validationError) {
+      await ctx.reply(`❌ ${validationError}\n\nВведите время вручную:`, backButtons);
+      return;
+    }
+    ctx.scene.session.pendingStartTime = timestamp.toISOString();
+    const endType = startType === TimeEntryType.LUNCH_START ? TimeEntryType.LUNCH_END : TimeEntryType.PERSONAL_LEAVE_END;
+    ctx.scene.session.selectedDate = `pair_end:${endType}`;
+    await showPairEndPrompt(ctx, endType, timestamp, true);
+    return;
+  }
+
+  if (meta.startsWith('pair_end:')) {
+    const endType = meta.slice('pair_end:'.length) as TimeEntryType;
+    const startType = endType === TimeEntryType.LUNCH_END ? TimeEntryType.LUNCH_START : TimeEntryType.PERSONAL_LEAVE_START;
+    const pendingStartStr = ctx.scene.session.pendingStartTime;
+    if (!pendingStartStr) return ctx.scene.leave();
+    const startTimestamp = new Date(pendingStartStr);
+    if (timestamp <= startTimestamp) {
+      await ctx.reply(`❌ Время окончания должно быть позже начала (${formatTime(startTimestamp)}).\n\nВведите время вручную:`, backButtons);
+      return;
+    }
+    const shiftEntries = await collectShiftEntries(empId, dateStr);
+    const virtualStart = { id: -999, type: startType, timestamp: startTimestamp };
+    const validationError = validateEntryTime(endType, timestamp, [...shiftEntries, virtualStart]);
+    if (validationError) {
+      await ctx.reply(`❌ ${validationError}\n\nВведите время вручную:`, backButtons);
+      return;
+    }
+    await timeEntryService.createEntryManual(editorId, empId, startType, startTimestamp, date);
+    await timeEntryService.createEntryManual(editorId, empId, endType, timestamp, date);
+    const actionLabel = startType === TimeEntryType.LUNCH_START ? 'Обед' : 'Отлучка';
+    await ctx.reply(`✅ ${actionLabel} добавлен: ${formatTime(startTimestamp)} — ${formatTime(timestamp)}`);
+    ctx.scene.session.pendingStartTime = undefined;
+    ctx.scene.session.selectedDate = undefined;
+    ctx.wizard.selectStep(2);
+    await showEntriesList(ctx, empId, date);
+    return;
+  }
 
   if (meta.startsWith('eid:')) {
     const entryId = parseInt(meta.slice(4), 10);
@@ -722,12 +834,17 @@ adminEditWizard.action('edit_back_to_list', async (ctx) => {
 
 adminEditWizard.action('edit_cancel_input', async (ctx) => {
   await ctx.answerCbQuery();
+  const wasPairEnd = ctx.scene.session.selectedDate?.startsWith('pair_end:');
   ctx.scene.session.selectedDate = undefined;
+  ctx.scene.session.pendingStartTime = undefined;
   const empId = ctx.scene.session.selectedEmployeeId;
   const dateStr = ctx.scene.session.selectedPeriodFrom;
   if (!empId || !dateStr) return ctx.scene.enter(ADMIN_MENU_SCENE_ID);
   const date = new Date(`${dateStr}T00:00:00.000Z`);
   ctx.wizard.selectStep(2);
+  if (wasPairEnd) {
+    await ctx.reply('Добавление отменено. Данные не сохранены.');
+  }
   await showEntriesList(ctx, empId, date);
 });
 
