@@ -127,6 +127,10 @@ async function showAddTypeMenu(
   const effectiveWorkStarted =
     existingTypes.has(TimeEntryType.WORK_START) || prevDayShiftOpen;
 
+  // Shift is ended if today's WORK_END is present or cross-midnight shift was closed today
+  const shiftEnded = existingTypes.has(TimeEntryType.WORK_END) || todayHasCrossMidnightEnd;
+  const shiftActive = effectiveWorkStarted && !shiftEnded;
+
   const rows = Object.entries(TYPE_LABELS).map(([type, label]) => {
     const t = type as TimeEntryType;
     const noWorkStart = !effectiveWorkStarted;
@@ -151,7 +155,11 @@ async function showAddTypeMenu(
     const returnBlocked = t === TimeEntryType.PERSONAL_LEAVE_END && !onLeave;
     const onLunchBlocked = onLunch && t !== TimeEntryType.LUNCH_END;
     const onLeaveBlocked = onLeave && t !== TimeEntryType.PERSONAL_LEAVE_END;
-    const blocked = onSickLeave || onLunchBlocked || onLeaveBlocked || requiresWorkStart || workStartCrossMidnight || sickLeaveBlocked || lunchEndBlocked || returnBlocked;
+    // Lunch and absence are only allowed during an active shift
+    const afterShiftBlocked =
+      shiftEnded &&
+      (t === TimeEntryType.PERSONAL_LEAVE_START || t === TimeEntryType.LUNCH_START);
+    const blocked = onSickLeave || onLunchBlocked || onLeaveBlocked || requiresWorkStart || workStartCrossMidnight || sickLeaveBlocked || lunchEndBlocked || returnBlocked || afterShiftBlocked;
 
     const icon = alreadyDone ? '✅' : blocked ? '❌' : null;
     return [
