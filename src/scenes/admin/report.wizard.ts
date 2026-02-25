@@ -244,6 +244,14 @@ adminReportWizard.action('rpt_today', async (ctx) => {
   return ctx.scene.enter(ADMIN_MENU_SCENE_ID);
 });
 
+adminReportWizard.action('rpt_yesterday', async (ctx) => {
+  await ctx.answerCbQuery();
+  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [[{ text: '📋 Меню', callback_data: 'go_menu' }]] }); } catch {}
+  const yesterday = new Date(todayDateUTC7().getTime() - 86_400_000);
+  await showReport(ctx, yesterday, yesterday);
+  return ctx.scene.enter(ADMIN_MENU_SCENE_ID);
+});
+
 adminReportWizard.action('rpt_week', async (ctx) => {
   await ctx.answerCbQuery();
   try { await ctx.editMessageReplyMarkup({ inline_keyboard: [[{ text: '📋 Меню', callback_data: 'go_menu' }]] }); } catch {}

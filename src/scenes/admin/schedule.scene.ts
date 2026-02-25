@@ -1,7 +1,7 @@
 import { Scenes, Markup } from 'telegraf';
 import { BotContext } from '../../types/context';
 import { reportService, EmployeeStatus } from '../../services/report.service';
-import { formatDate } from '../../utils/time';
+import { formatDate, todayDateUTC7 } from '../../utils/time';
 import { ADMIN_MENU_SCENE_ID } from './menu.scene';
 
 export const ADMIN_SCHEDULE_SCENE_ID = 'admin_schedule';
@@ -26,14 +26,36 @@ adminScheduleScene.enter(async (ctx) => {
   }
 
   const schedule = await reportService.getDaySchedule();
-  const dateStr = formatDate(new Date());
+  const today = todayDateUTC7();
+  const yesterday = new Date(today.getTime() - 86_400_000);
 
-  const lines = [`📋 *Расписание на ${dateStr}*`, ''];
+  const lines = [`📋 *Расписание*`, ''];
   if (schedule.length === 0) {
     lines.push('Нет активных сотрудников.');
   } else {
+    // Group by shiftDate
+    const byDay = new Map<number, typeof schedule>();
     for (const entry of schedule) {
-      lines.push(`${statusLine(entry.status)} — ${entry.lastName} ${entry.firstName}`);
+      const key = entry.shiftDate.getTime();
+      if (!byDay.has(key)) byDay.set(key, []);
+      byDay.get(key)!.push(entry);
+    }
+
+    // Sort days descending (today first, then yesterday)
+    const sortedDays = Array.from(byDay.entries()).sort((a, b) => b[0] - a[0]);
+
+    for (const [ts, entries] of sortedDays) {
+      const dayDate = new Date(ts);
+      const isToday = dayDate.getTime() === today.getTime();
+      const isYesterday = dayDate.getTime() === yesterday.getTime();
+      const label = isToday ? `Сегодня (${formatDate(dayDate)})` :
+                   isYesterday ? `Вчера (${formatDate(dayDate)})` :
+                   formatDate(dayDate);
+      lines.push(`📅 *${label}:*`);
+      for (const entry of entries) {
+        lines.push(`${statusLine(entry.status)} — ${entry.lastName} ${entry.firstName}`);
+      }
+      lines.push('');
     }
   }
 

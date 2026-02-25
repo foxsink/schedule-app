@@ -14,6 +14,7 @@ export interface DayScheduleEntry {
   id: number;
   firstName: string;
   lastName: string;
+  shiftDate: Date; // UTC-midnight of the day the shift started (WORK_START day)
   status: EmployeeStatus;
 }
 
@@ -154,7 +155,8 @@ export const reportService = {
         status = { kind: 'not_started' };
       }
 
-      return { id: emp.id, firstName: emp.firstName, lastName: emp.lastName, status };
+      const shiftDate = (crossMidnightEnd || crossMidnightOpen) ? yesterday : targetDate;
+      return { id: emp.id, firstName: emp.firstName, lastName: emp.lastName, shiftDate, status };
     });
   },
 
