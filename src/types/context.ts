@@ -6,7 +6,6 @@ export interface SessionData extends Scenes.WizardSessionData {
   selectedDate?: string;
   selectedPeriodFrom?: string;
   selectedPeriodTo?: string;
-  pendingStartTime?: string; // ISO timestamp for the start half of a pair (lunch/absence)
 }
 
 export interface BotContext extends Context {
