@@ -138,6 +138,77 @@ function getEntriesToDelete(shiftEntries: ShiftEntry[], targetId: number): Shift
   return shiftEntries.slice(idx);
 }
 
+/** Validates that a new entry of `type` at `timestamp` can be inserted into the shift.
+ *  Returns an error string if invalid, null if OK.
+ *  Only enforces strict rules for closed shifts (WORK_START + WORK_END both present). */
+function validateEntryTime(
+  type: TimeEntryType,
+  timestamp: Date,
+  shiftEntries: ShiftEntry[],
+): string | null {
+  const sorted = [...shiftEntries].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+  const workStart = sorted.find((e) => e.type === TimeEntryType.WORK_START);
+  const workEnd = sorted.find((e) => e.type === TimeEntryType.WORK_END);
+
+  // Only apply time-based validation for closed shifts
+  if (!workStart || !workEnd) return null;
+
+  const T = timestamp.getTime();
+  const shiftStartMs = workStart.timestamp.getTime();
+  const shiftEndMs = workEnd.timestamp.getTime();
+
+  if (T <= shiftStartMs || T >= shiftEndMs) {
+    return `Время должно быть строго внутри смены (${formatTime(workStart.timestamp)}–${formatTime(workEnd.timestamp)}).`;
+  }
+
+  if (sorted.some((e) => e.timestamp.getTime() === T)) {
+    return 'Уже есть запись с таким временем.';
+  }
+
+  if (type === TimeEntryType.PERSONAL_LEAVE_START || type === TimeEntryType.LUNCH_START) {
+    // Must not fall inside any existing paired interval (lunch or absence)
+    const intervals: [TimeEntryType, TimeEntryType][] = [
+      [TimeEntryType.LUNCH_START, TimeEntryType.LUNCH_END],
+      [TimeEntryType.PERSONAL_LEAVE_START, TimeEntryType.PERSONAL_LEAVE_END],
+    ];
+    for (const [startType, endType] of intervals) {
+      const starts = sorted.filter((e) => e.type === startType);
+      const ends = sorted.filter((e) => e.type === endType);
+      for (let i = 0; i < starts.length; i++) {
+        const s = starts[i].timestamp.getTime();
+        const e = ends[i]?.timestamp.getTime() ?? shiftEndMs;
+        if (T > s && T < e) {
+          return `Время попадает внутрь «${TYPE_LABELS[startType]}».`;
+        }
+      }
+    }
+  }
+
+  if (type === TimeEntryType.PERSONAL_LEAVE_END) {
+    const leaveStarts = sorted.filter((e) => e.type === TimeEntryType.PERSONAL_LEAVE_START);
+    const leaveEnds = sorted.filter((e) => e.type === TimeEntryType.PERSONAL_LEAVE_END);
+    if (leaveStarts.length <= leaveEnds.length) return 'Нет открытой отлучки.';
+    const unclosed = leaveStarts[leaveEnds.length];
+    if (T <= unclosed.timestamp.getTime()) return 'Возврат должен быть позже начала отлучки.';
+    const nextEvt = sorted.find((e) => e.timestamp.getTime() > unclosed.timestamp.getTime());
+    if (nextEvt && T >= nextEvt.timestamp.getTime()) {
+      return `Время должно быть до следующего события (${formatTime(nextEvt.timestamp)} — ${TYPE_LABELS[nextEvt.type]}).`;
+    }
+  }
+
+  if (type === TimeEntryType.LUNCH_END) {
+    const lunchStart = sorted.find((e) => e.type === TimeEntryType.LUNCH_START);
+    if (!lunchStart) return 'Нет начала обеда.';
+    if (T <= lunchStart.timestamp.getTime()) return 'Конец обеда должен быть позже начала.';
+    const nextEvt = sorted.find((e) => e.timestamp.getTime() > lunchStart.timestamp.getTime());
+    if (nextEvt && T >= nextEvt.timestamp.getTime()) {
+      return `Время должно быть до следующего события (${formatTime(nextEvt.timestamp)} — ${TYPE_LABELS[nextEvt.type]}).`;
+    }
+  }
+
+  return null;
+}
+
 async function showEntryActions(ctx: BotContext, entryId: number): Promise<void> {
   const entry = await prisma.timeEntry.findUnique({ where: { id: entryId } });
   if (!entry) {
@@ -194,10 +265,6 @@ async function showAddTypeMenu(
   const effectiveWorkStarted =
     existingTypes.has(TimeEntryType.WORK_START) || prevDayShiftOpen;
 
-  // Shift is ended if today's WORK_END is present or cross-midnight shift was closed today
-  const shiftEnded = existingTypes.has(TimeEntryType.WORK_END) || todayHasCrossMidnightEnd;
-  const shiftActive = effectiveWorkStarted && !shiftEnded;
-
   const rows = Object.entries(TYPE_LABELS).map(([type, label]) => {
     const t = type as TimeEntryType;
     const noWorkStart = !effectiveWorkStarted;
@@ -222,11 +289,7 @@ async function showAddTypeMenu(
     const returnBlocked = t === TimeEntryType.PERSONAL_LEAVE_END && !onLeave;
     const onLunchBlocked = onLunch && t !== TimeEntryType.LUNCH_END;
     const onLeaveBlocked = onLeave && t !== TimeEntryType.PERSONAL_LEAVE_END;
-    // Lunch and absence are only allowed during an active shift
-    const afterShiftBlocked =
-      shiftEnded &&
-      (t === TimeEntryType.PERSONAL_LEAVE_START || t === TimeEntryType.LUNCH_START);
-    const blocked = onSickLeave || onLunchBlocked || onLeaveBlocked || requiresWorkStart || workStartCrossMidnight || sickLeaveBlocked || lunchEndBlocked || returnBlocked || afterShiftBlocked;
+    const blocked = onSickLeave || onLunchBlocked || onLeaveBlocked || requiresWorkStart || workStartCrossMidnight || sickLeaveBlocked || lunchEndBlocked || returnBlocked;
 
     const icon = alreadyDone ? '✅' : blocked ? '❌' : null;
     return [
@@ -307,6 +370,15 @@ export const adminEditWizard = new Scenes.WizardScene<BotContext>(
       await ctx.reply(`✅ Время обновлено на ${formatTime(timestamp)}`);
     } else if (meta.startsWith('add:')) {
       const type = meta.slice(4) as TimeEntryType;
+      const shiftEntries = await collectShiftEntries(empId, dateStr);
+      const validationError = validateEntryTime(type, timestamp, shiftEntries);
+      if (validationError) {
+        await ctx.reply(
+          `❌ ${validationError}\n\nВведите другое время:`,
+          Markup.inlineKeyboard([[Markup.button.callback('« Назад к списку', 'edit_cancel_input'), Markup.button.callback('📋 Меню', 'go_menu')]]),
+        );
+        return;
+      }
       await timeEntryService.createEntryManual(editorId, empId, type, timestamp, date);
       await ctx.reply(`✅ Запись добавлена: ${TYPE_LABELS[type]} в ${formatTime(timestamp)}`);
     }
@@ -544,6 +616,15 @@ adminEditWizard.action(/^edit_lunch_end_(30|60)$/, async (ctx) => {
   if (!lunchStart) return ctx.scene.leave();
   const offsetMin = ctx.match[1] === '30' ? 30 : 60;
   const timestamp = new Date(lunchStart.timestamp.getTime() + offsetMin * 60_000);
+  const shiftEntries = await collectShiftEntries(empId, dateStr);
+  const validationError = validateEntryTime(TimeEntryType.LUNCH_END, timestamp, shiftEntries);
+  if (validationError) {
+    await ctx.reply(
+      `❌ ${validationError}\n\nВведите время вручную:`,
+      Markup.inlineKeyboard([[Markup.button.callback('« Назад к списку', 'edit_cancel_input'), Markup.button.callback('📋 Меню', 'go_menu')]]),
+    );
+    return;
+  }
   await timeEntryService.createEntryManual(editorId, empId, TimeEntryType.LUNCH_END, timestamp, date);
   ctx.scene.session.selectedDate = undefined;
   ctx.wizard.selectStep(2);
@@ -573,6 +654,15 @@ adminEditWizard.action('edit_time_now', async (ctx) => {
     await ctx.reply(`✅ Время обновлено на ${formatTime(timestamp)}`);
   } else if (meta.startsWith('add:')) {
     const type = meta.slice(4) as TimeEntryType;
+    const shiftEntries = await collectShiftEntries(empId, dateStr);
+    const validationError = validateEntryTime(type, timestamp, shiftEntries);
+    if (validationError) {
+      await ctx.reply(
+        `❌ ${validationError}\n\nВведите время вручную:`,
+        Markup.inlineKeyboard([[Markup.button.callback('« Назад к списку', 'edit_cancel_input'), Markup.button.callback('📋 Меню', 'go_menu')]]),
+      );
+      return;
+    }
     await timeEntryService.createEntryManual(editorId, empId, type, timestamp, date);
     await ctx.reply(`✅ Запись добавлена: ${TYPE_LABELS[type]} в ${formatTime(timestamp)}`);
   }
