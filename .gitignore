@@ -2,4 +2,6 @@ node_modules/
 dist/
 .env
 prisma/*.db
-.claude/settings.local.json
+.claude/
+.vscode/
+./**/.DS_Store
