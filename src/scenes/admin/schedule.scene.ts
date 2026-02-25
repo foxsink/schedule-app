@@ -61,7 +61,7 @@ adminScheduleScene.enter(async (ctx) => {
 
   const keyboard = Markup.inlineKeyboard([
     [Markup.button.callback('🔄 Обновить', 'sched_refresh')],
-    [Markup.button.callback('« Назад', 'sched_back')],
+    [Markup.button.callback('« Назад', 'sched_back'), Markup.button.callback('📋 Меню', 'go_menu')],
   ]);
 
   await ctx.reply(lines.join('\n'), { parse_mode: 'Markdown', ...keyboard });

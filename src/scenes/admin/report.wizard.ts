@@ -332,8 +332,10 @@ adminReportWizard.action('rpt_cancel_custom', async (ctx) => {
   await ctx.reply('Выберите период:', PERIOD_KEYBOARD);
 });
 
+// From period keyboard → back to employee list
 adminReportWizard.action('rpt_back', async (ctx) => {
   await ctx.answerCbQuery();
   try { await ctx.editMessageReplyMarkup({ inline_keyboard: [[{ text: '📋 Меню', callback_data: 'go_menu' }]] }); } catch {}
-  return ctx.scene.enter(ADMIN_MENU_SCENE_ID);
+  ctx.wizard.selectStep(0);
+  await showEmployeeKeyboard(ctx);
 });

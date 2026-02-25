@@ -89,7 +89,7 @@ async function showAuditPage(ctx: BotContext, page: number): Promise<void> {
 
   const rows: ReturnType<typeof Markup.button.callback>[][] = [];
   if (navButtons.length) rows.push(navButtons);
-  rows.push([Markup.button.callback('« Назад', 'audit_back')]);
+  rows.push([Markup.button.callback('« Назад', 'audit_back'), Markup.button.callback('📋 Меню', 'go_menu')]);
 
   // Send in chunks if too long
   const chunks = text.length > 3800 ? [text.slice(0, 3800)] : [text];

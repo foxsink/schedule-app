@@ -33,7 +33,7 @@ const PERIOD_KEYBOARD = Markup.inlineKeyboard([
   [Markup.button.callback('Сегодня', 'sal_today'), Markup.button.callback('Эта неделя', 'sal_week')],
   [Markup.button.callback('Прошлая неделя', 'sal_last_week'), Markup.button.callback('Этот месяц', 'sal_month')],
   [Markup.button.callback('Прошлый месяц', 'sal_last_month'), Markup.button.callback('Ввести даты', 'sal_custom')],
-  [Markup.button.callback('« Назад', 'sal_back'), Markup.button.callback('📋 Меню', 'go_menu')],
+  [Markup.button.callback('« Назад', 'sal_period_back'), Markup.button.callback('📋 Меню', 'go_menu')],
 ]);
 
 async function showEmployeeList(ctx: BotContext): Promise<void> {
@@ -81,7 +81,7 @@ async function showSalaryForPeriod(ctx: BotContext, from: Date, to: Date, adjPag
       [Markup.button.callback('🎁 Добавить премию', `sal_bonus_${empId}`), Markup.button.callback('⚠️ Добавить штраф', `sal_penalty_${empId}`)],
       ...adjDeleteRows,
       ...(navRow.length > 0 ? [navRow] : []),
-      [Markup.button.callback('« Назад', 'sal_back')],
+      [Markup.button.callback('« Назад', 'sal_result_back'), Markup.button.callback('📋 Меню', 'go_menu')],
     ]);
     await ctx.reply(formatSalaryResult(result), { parse_mode: 'Markdown', ...keyboard });
   } else {
@@ -101,7 +101,7 @@ async function showSalaryForPeriod(ctx: BotContext, from: Date, to: Date, adjPag
       grandTotal += r.netSalary;
     }
     lines.push(`\n_Итого: ${Math.round(grandTotal * 100) / 100} руб_`);
-    const keyboard = Markup.inlineKeyboard([[Markup.button.callback('« Назад', 'sal_back')]]);
+    const keyboard = Markup.inlineKeyboard([[Markup.button.callback('« Назад', 'sal_result_back'), Markup.button.callback('📋 Меню', 'go_menu')]]);
     await ctx.reply(lines.join('\n'), { parse_mode: 'Markdown', ...keyboard });
   }
 }
@@ -435,4 +435,19 @@ adminSalaryWizard.action('sal_back', async (ctx) => {
   await ctx.answerCbQuery();
   try { await ctx.editMessageReplyMarkup({ inline_keyboard: [[{ text: '📋 Меню', callback_data: 'go_menu' }]] }); } catch {}
   return ctx.scene.enter(ADMIN_MENU_SCENE_ID);
+});
+
+// From period keyboard → back to employee list
+adminSalaryWizard.action('sal_period_back', async (ctx) => {
+  await ctx.answerCbQuery();
+  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [[{ text: '📋 Меню', callback_data: 'go_menu' }]] }); } catch {}
+  ctx.wizard.selectStep(0);
+  await showEmployeeList(ctx);
+});
+
+// From salary result → back to period selection
+adminSalaryWizard.action('sal_result_back', async (ctx) => {
+  await ctx.answerCbQuery();
+  ctx.wizard.selectStep(1);
+  await ctx.reply('Выберите период:', PERIOD_KEYBOARD);
 });
