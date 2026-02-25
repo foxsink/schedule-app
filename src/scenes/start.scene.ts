@@ -48,7 +48,7 @@ export const startScene = new Scenes.WizardScene<BotContext>(
       return ctx.scene.leave();
     }
 
-    await employeeService.linkTelegram(employee.id, BigInt(ctx.from.id));
+    await employeeService.linkTelegram(employee.id, BigInt(ctx.from.id), ctx.from.username);
     await ctx.reply(`Добро пожаловать, ${employee.firstName} ${employee.lastName}! Вы успешно авторизованы.`);
     return ctx.scene.enter(EMPLOYEE_MENU_SCENE_ID);
   }

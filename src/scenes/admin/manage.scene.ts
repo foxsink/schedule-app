@@ -40,7 +40,9 @@ async function showEmployeeCard(ctx: BotContext, employeeId: number): Promise<vo
   const rate = emp.rates[0];
   const rateStr = rate ? `${Number(rate.rate)} руб/ч (с ${formatDate(rate.effectiveFrom)})` : 'не установлена';
   const statusStr = emp.isActive ? '✅ активен' : '❌ деактивирован';
-  const tgStr = emp.telegramId ? `ID: ${emp.telegramId}` : 'не привязан';
+  const tgStr = emp.telegramId
+    ? emp.telegramUsername ? `@${emp.telegramUsername}` : `ID: ${emp.telegramId}`
+    : 'не привязан';
   const codeStr = emp.invitationCode ? `Код: \`${emp.invitationCode}\`` : 'код использован';
 
   const roleStr = emp.role === 'SUPER_ADMIN' ? '👑 Супер-админ' : emp.role === 'ADMIN' ? '🔧 Админ' : '👤 Сотрудник';

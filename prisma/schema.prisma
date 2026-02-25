@@ -43,8 +43,9 @@ enum AuditEntityType {
 
 model Employee {
   id             Int       @id @default(autoincrement())
-  telegramId     BigInt?   @unique
-  firstName      String
+  telegramId       BigInt?   @unique
+  telegramUsername String?
+  firstName        String
   lastName       String
   role           Role      @default(EMPLOYEE)
   invitationCode String?   @unique

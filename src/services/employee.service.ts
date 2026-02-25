@@ -11,10 +11,10 @@ export const employeeService = {
     return prisma.employee.findUnique({ where: { invitationCode: code } });
   },
 
-  async linkTelegram(employeeId: number, telegramId: bigint) {
+  async linkTelegram(employeeId: number, telegramId: bigint, telegramUsername?: string) {
     return prisma.employee.update({
       where: { id: employeeId },
-      data: { telegramId, invitationCode: null },
+      data: { telegramId, telegramUsername: telegramUsername ?? null, invitationCode: null },
     });
   },
 
