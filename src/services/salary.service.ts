@@ -3,7 +3,8 @@ import { AdjustmentType, TimeEntryType } from '@prisma/client';
 import { formatTime } from '../utils/time';
 
 export interface DaySalary {
-  date: string; // YYYY-MM-DD
+  date: string; // YYYY-MM-DD (calendar date of entries)
+  shiftStartDate?: string; // YYYY-MM-DD — set when shift started on previous calendar day (cross-midnight Case C)
   netHours: number;
   rate: number;
   amount: number;
@@ -129,6 +130,7 @@ export const salaryService = {
 
       // Cross-midnight case C: WORK_START is on previous calendar day.
       // Handles reports where only the WORK_END day is in range.
+      let shiftStartDate: string | undefined;
       if (!workStart && workEnd && isInRange) {
         const prevDateKey = new Date(date.getTime() - 86_400_000).toISOString().slice(0, 10);
         const prevDayEntries = byDate.get(prevDateKey) ?? [];
@@ -138,6 +140,7 @@ export const salaryService = {
         if (crossDayStart) {
           consumedEntryIds.add(crossDayStart.id);
           workStart = crossDayStart;
+          shiftStartDate = prevDateKey;
         }
       }
 
@@ -168,6 +171,7 @@ export const salaryService = {
 
       days.push({
         date: dateKey,
+        shiftStartDate,
         netHours: Math.round(netHours * 100) / 100,
         rate,
         amount: Math.round(amount * 100) / 100,

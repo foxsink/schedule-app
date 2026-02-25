@@ -19,6 +19,20 @@ function parseDate(str: string): Date | null {
 
 const DAY_NAMES = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
 
+function dayHeader(d: { date: string; shiftStartDate?: string }, indent = ''): string {
+  const displayDate = d.shiftStartDate ?? d.date;
+  const dateObj = new Date(`${displayDate}T00:00:00.000Z`);
+  const dayName = DAY_NAMES[dateObj.getUTCDay()];
+  const today = todayDateUTC7();
+  const yesterday = new Date(today.getTime() - 86_400_000);
+  const suffix = d.shiftStartDate
+    ? dateObj.getTime() === yesterday.getTime() ? ' — вчера 🌙'
+    : dateObj.getTime() === today.getTime() ? ' — сегодня 🌙'
+    : ' 🌙'
+    : '';
+  return `${indent}📅 *${formatDate(dateObj)} (${dayName})${suffix}*`;
+}
+
 function hoursStr(h: number): string {
   const hh = Math.floor(h);
   const mm = Math.round((h - hh) * 60);
@@ -66,9 +80,7 @@ async function showReport(ctx: BotContext, from: Date, to: Date): Promise<void> 
       lines.push(`👤 *${r.lastName} ${r.firstName}*`);
 
       for (const d of r.days) {
-        const dateObj = new Date(`${d.date}T00:00:00.000Z`);
-        const dayName = DAY_NAMES[dateObj.getUTCDay()];
-        lines.push(`  📅 *${formatDate(dateObj)} (${dayName})*`);
+        lines.push(dayHeader(d, '  '));
         if (d.sickLeave) {
           lines.push('    🏥 Больничный');
         } else {
@@ -114,9 +126,7 @@ async function showReport(ctx: BotContext, from: Date, to: Date): Promise<void> 
   const lines: string[] = [header, ''];
 
   for (const d of r.days) {
-    const dateObj = new Date(`${d.date}T00:00:00.000Z`);
-    const dayName = DAY_NAMES[dateObj.getUTCDay()];
-    lines.push(`📅 *${formatDate(dateObj)} (${dayName})*`);
+    lines.push(dayHeader(d));
     if (d.sickLeave) {
       lines.push('  🏥 Больничный');
     } else {
