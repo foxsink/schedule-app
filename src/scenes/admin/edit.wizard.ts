@@ -44,7 +44,7 @@ async function showDateMenu(ctx: BotContext): Promise<void> {
 }
 
 async function showEntriesList(ctx: BotContext, employeeId: number, date: Date): Promise<void> {
-  const entries = sortEntries(await timeEntryService.getEntriesByDate(employeeId, date));
+  const entries = await timeEntryService.getEntriesByDate(employeeId, date);
   const employee = await prisma.employee.findUnique({ where: { id: employeeId } });
   const dateStr = formatDate(date);
   const name = employee ? `${employee.lastName} ${employee.firstName}` : `#${employeeId}`;
@@ -94,25 +94,11 @@ async function collectShiftEntries(
     extra = await prisma.timeEntry.findMany({ where: { employeeId, date: prevDate } });
   }
 
-  return sortEntries([...dayEntries, ...extra]);
+  return [...dayEntries, ...extra].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
 }
 
 type ShiftEntry = { id: number; type: TimeEntryType; timestamp: Date };
 
-const TYPE_PRIORITY: Partial<Record<TimeEntryType, number>> = {
-  [TimeEntryType.LUNCH_START]: 1,
-  [TimeEntryType.LUNCH_END]: 2,
-  [TimeEntryType.PERSONAL_LEAVE_START]: 3,
-  [TimeEntryType.PERSONAL_LEAVE_END]: 4,
-};
-
-function sortEntries<T extends { type: TimeEntryType; timestamp: Date }>(entries: T[]): T[] {
-  return [...entries].sort((a, b) => {
-    const timeDiff = a.timestamp.getTime() - b.timestamp.getTime();
-    if (timeDiff !== 0) return timeDiff;
-    return (TYPE_PRIORITY[a.type] ?? 0) - (TYPE_PRIORITY[b.type] ?? 0);
-  });
-}
 
 /** Returns the list of entries that will be deleted when the given entry is deleted.
  *  - PERSONAL_LEAVE_START / LUNCH_START: only the entry itself + its closing counterpart (if present).
@@ -161,7 +147,7 @@ function validateEntryTime(
   timestamp: Date,
   shiftEntries: ShiftEntry[],
 ): string | null {
-  const sorted = sortEntries(shiftEntries);
+  const sorted = [...shiftEntries].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
   const workStart = sorted.find((e) => e.type === TimeEntryType.WORK_START);
   const workEnd = sorted.find((e) => e.type === TimeEntryType.WORK_END);
 
@@ -174,6 +160,10 @@ function validateEntryTime(
 
   if (T <= shiftStartMs || T >= shiftEndMs) {
     return `Время должно быть строго внутри смены (${formatTime(workStart.timestamp)}–${formatTime(workEnd.timestamp)}).`;
+  }
+
+  if (sorted.some((e) => Math.abs(e.timestamp.getTime() - T) < 60_000)) {
+    return 'Между событиями должна быть не менее минуты разницы.';
   }
 
   if (type === TimeEntryType.PERSONAL_LEAVE_START || type === TimeEntryType.LUNCH_START) {
