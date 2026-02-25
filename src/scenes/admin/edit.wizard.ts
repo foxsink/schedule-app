@@ -401,7 +401,7 @@ adminEditWizard.action(/^edit_delete_(\d+)$/, async (ctx) => {
       where: { employeeId: empId, type: TimeEntryType.WORK_START, timestamp: { gt: entry.timestamp } },
     });
     if (nextShift) {
-      await ctx.reply('⛔ Нельзя удалить конец смены: после неё уже начата следующая смена.');
+      await ctx.reply('⛔ Нельзя удалить конец смены: после неё уже начата следующая смена.\n\nЧтобы удалить эту смену целиком, удалите её начало (запись «Начало дня»).');
       return;
     }
   }
