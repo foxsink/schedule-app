@@ -150,11 +150,22 @@ function validateEntryTime(
   const sorted = [...shiftEntries].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
   const workStart = sorted.find((e) => e.type === TimeEntryType.WORK_START);
   const workEnd = sorted.find((e) => e.type === TimeEntryType.WORK_END);
-
-  // Only apply time-based validation for closed shifts
-  if (!workStart || !workEnd) return null;
-
   const T = timestamp.getTime();
+
+  // LUNCH_START must always be before any open absence, regardless of shift state
+  if (type === TimeEntryType.LUNCH_START) {
+    const leaveStarts = sorted.filter((e) => e.type === TimeEntryType.PERSONAL_LEAVE_START);
+    const leaveEnds = sorted.filter((e) => e.type === TimeEntryType.PERSONAL_LEAVE_END);
+    if (leaveStarts.length > leaveEnds.length) {
+      const unclosedLeave = leaveStarts[leaveEnds.length];
+      if (T >= unclosedLeave.timestamp.getTime()) {
+        return `Начало обеда должно быть раньше начала отлучки (${formatTime(unclosedLeave.timestamp)}).`;
+      }
+    }
+  }
+
+  // Only apply time-boundary validation for closed shifts
+  if (!workStart || !workEnd) return null;
   const shiftStartMs = workStart.timestamp.getTime();
   const shiftEndMs = workEnd.timestamp.getTime();
 
@@ -289,7 +300,7 @@ async function showAddTypeMenu(
     const lunchEndBlocked = t === TimeEntryType.LUNCH_END && !onLunch;
     const returnBlocked = t === TimeEntryType.PERSONAL_LEAVE_END && !onLeave;
     const onLunchBlocked = onLunch && t !== TimeEntryType.LUNCH_END;
-    const onLeaveBlocked = onLeave && t !== TimeEntryType.PERSONAL_LEAVE_END;
+    const onLeaveBlocked = onLeave && t !== TimeEntryType.PERSONAL_LEAVE_END && t !== TimeEntryType.LUNCH_START;
     const blocked = onSickLeave || onLunchBlocked || onLeaveBlocked || requiresWorkStart || workStartCrossMidnight || sickLeaveBlocked || lunchEndBlocked || returnBlocked;
 
     const icon = alreadyDone ? '✅' : blocked ? '❌' : null;
