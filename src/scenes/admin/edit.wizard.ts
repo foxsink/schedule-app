@@ -161,10 +161,6 @@ function validateEntryTime(
     return `Время должно быть строго внутри смены (${formatTime(workStart.timestamp)}–${formatTime(workEnd.timestamp)}).`;
   }
 
-  if (sorted.some((e) => e.timestamp.getTime() === T)) {
-    return 'Уже есть запись с таким временем.';
-  }
-
   if (type === TimeEntryType.PERSONAL_LEAVE_START || type === TimeEntryType.LUNCH_START) {
     // Must not fall inside any existing paired interval (lunch or absence)
     const intervals: [TimeEntryType, TimeEntryType][] = [
