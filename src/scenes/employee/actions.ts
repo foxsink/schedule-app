@@ -31,9 +31,8 @@ export function registerEmployeeActions(bot: Telegraf<BotContext>) {
 
   for (const action of actions) {
     bot.action(action, async (ctx) => {
-      await ctx.answerCbQuery();
-
       if (!ctx.employee) {
+        await ctx.answerCbQuery();
         await ctx.reply('Вы не авторизованы. Введите /start.');
         return;
       }
@@ -42,6 +41,7 @@ export function registerEmployeeActions(bot: Telegraf<BotContext>) {
 
       try {
         await timeEntryService.addEntry(ctx.employee.id, type);
+        await ctx.answerCbQuery();
         const now = new Date();
         await ctx.editMessageText(
           `${ACTION_MESSAGES[action]} в ${formatTime(now)}`,
