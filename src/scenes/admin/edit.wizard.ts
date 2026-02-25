@@ -127,6 +127,14 @@ function getEntriesToDelete(shiftEntries: ShiftEntry[], targetId: number): Shift
     return [target];
   }
 
+  // WORK_START: delete this shift only — from WORK_START up to and including its WORK_END.
+  // If no WORK_END exists (ongoing shift), delete everything from here to end of shiftEntries.
+  if (target.type === TimeEntryType.WORK_START) {
+    const tail = shiftEntries.slice(idx);
+    const workEndIdx = tail.findIndex((e) => e.type === TimeEntryType.WORK_END);
+    return workEndIdx >= 0 ? tail.slice(0, workEndIdx + 1) : tail;
+  }
+
   return shiftEntries.slice(idx);
 }
 
