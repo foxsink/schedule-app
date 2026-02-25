@@ -97,6 +97,31 @@ async function collectShiftEntries(
   return [...dayEntries, ...extra].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
 }
 
+type ShiftEntry = { id: number; type: TimeEntryType; timestamp: Date };
+
+/** Returns the list of entries that will be deleted when the given entry is deleted.
+ *  - PERSONAL_LEAVE_START / LUNCH_START: only the entry itself + its closing counterpart (if present).
+ *  - Everything else: the entry + all subsequent entries within the shift (cascade). */
+function getEntriesToDelete(shiftEntries: ShiftEntry[], targetId: number): ShiftEntry[] {
+  const idx = shiftEntries.findIndex((e) => e.id === targetId);
+  if (idx < 0) return [];
+  const target = shiftEntries[idx];
+
+  if (
+    target.type === TimeEntryType.PERSONAL_LEAVE_START ||
+    target.type === TimeEntryType.LUNCH_START
+  ) {
+    const endType =
+      target.type === TimeEntryType.PERSONAL_LEAVE_START
+        ? TimeEntryType.PERSONAL_LEAVE_END
+        : TimeEntryType.LUNCH_END;
+    const closingEntry = shiftEntries.slice(idx + 1).find((e) => e.type === endType);
+    return closingEntry ? [target, closingEntry] : [target];
+  }
+
+  return shiftEntries.slice(idx);
+}
+
 async function showEntryActions(ctx: BotContext, entryId: number): Promise<void> {
   const entry = await prisma.timeEntry.findUnique({ where: { id: entryId } });
   if (!entry) {
@@ -363,8 +388,8 @@ adminEditWizard.action(/^edit_delete_(\d+)$/, async (ctx) => {
   }
 
   const shiftEntries = await collectShiftEntries(empId, dateStr);
-  const idx = shiftEntries.findIndex((e) => e.id === entryId);
-  const toDelete = idx >= 0 ? shiftEntries.slice(idx) : [entry];
+  const toDelete = getEntriesToDelete(shiftEntries, entryId);
+  if (toDelete.length === 0) toDelete.push(entry as ShiftEntry);
 
   const listLines = toDelete.map((e, i) => `${i + 1}. ${formatTime(e.timestamp)} — ${TYPE_LABELS[e.type]}`);
   const warning =
@@ -396,8 +421,8 @@ adminEditWizard.action(/^edit_delete_confirm_(\d+)$/, async (ctx) => {
   }
 
   const shiftEntries = await collectShiftEntries(empId, dateStr);
-  const idx = shiftEntries.findIndex((e) => e.id === entryId);
-  const toDelete = idx >= 0 ? shiftEntries.slice(idx) : [entry];
+  const toDelete = getEntriesToDelete(shiftEntries, entryId);
+  if (toDelete.length === 0) toDelete.push(entry as ShiftEntry);
 
   for (const e of toDelete) {
     await timeEntryService.deleteEntry(editorId, e.id);
