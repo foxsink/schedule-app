@@ -5,4 +5,5 @@ src/generated/
 prisma/*.db
 .claude/
 .vscode/
-./**/.DS_Store
+.DS_Store
+**/.DS_Store
