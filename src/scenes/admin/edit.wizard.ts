@@ -197,10 +197,22 @@ function validateEntryTime(
   }
 
   if (type === TimeEntryType.PERSONAL_LEAVE_END) {
-    const leaveStarts = sorted.filter((e) => e.type === TimeEntryType.PERSONAL_LEAVE_START);
-    const leaveEnds = sorted.filter((e) => e.type === TimeEntryType.PERSONAL_LEAVE_END);
-    if (leaveStarts.length <= leaveEnds.length) return 'Нет открытой отлучки.';
-    const unclosed = leaveStarts[leaveEnds.length];
+    // Stack-based matching: correctly handles virtual entries injected before existing pairs.
+    // Positional indexing (leaveStarts[leaveEnds.length]) fails when a new start is inserted
+    // before an already-closed pair, causing it to identify the wrong "unclosed" entry.
+    const leaveEvents = sorted.filter(
+      (e) => e.type === TimeEntryType.PERSONAL_LEAVE_START || e.type === TimeEntryType.PERSONAL_LEAVE_END,
+    );
+    const openStack: ShiftEntry[] = [];
+    for (const e of leaveEvents) {
+      if (e.type === TimeEntryType.PERSONAL_LEAVE_START) {
+        openStack.push(e);
+      } else {
+        openStack.pop();
+      }
+    }
+    const unclosed = openStack[openStack.length - 1] ?? null;
+    if (!unclosed) return 'Нет открытой отлучки.';
     if (T < unclosed.timestamp.getTime()) return 'Возврат должен быть не раньше начала отлучки.';
     const nextEvt = sorted.find((e) => e.timestamp.getTime() > unclosed.timestamp.getTime());
     if (nextEvt && T > nextEvt.timestamp.getTime()) {
