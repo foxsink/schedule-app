@@ -49,22 +49,35 @@ export const timeEntryService = {
     if (!lastWorkStart) {
       // No WORK_START today — check cross-midnight scenario
       const yesterday = new Date(todayDateUTC7().getTime() - 86_400_000);
-      const prevEntries = await prisma.timeEntry.findMany({ where: { employeeId, date: yesterday } });
-      const prevTypes = prevEntries.map((e) => e.type);
+      const prevEntries = await prisma.timeEntry.findMany({
+        where: { employeeId, date: yesterday },
+        orderBy: { timestamp: 'asc' },
+      });
+
+      // Use timestamp ordering to detect open shift — handles double cross-midnight
+      // (yesterday may have WORK_END from a prior cross-midnight close + new WORK_START)
+      const prevWorkStarts = prevEntries.filter((e) => e.type === TimeEntryType.WORK_START);
+      const prevWorkEnds = prevEntries.filter((e) => e.type === TimeEntryType.WORK_END);
+      const prevLastWorkStart = prevWorkStarts[prevWorkStarts.length - 1];
+      const prevLastWorkEnd = prevWorkEnds[prevWorkEnds.length - 1];
 
       // todayHasCrossMidnightEnd: today has WORK_END (from closing yesterday's night shift)
       const todayHasCrossMidnightEnd = !!lastWorkEnd;
       const prevShiftOpen =
-        prevTypes.includes(TimeEntryType.WORK_START) &&
-        !prevTypes.includes(TimeEntryType.WORK_END) &&
+        !!prevLastWorkStart &&
+        (!prevLastWorkEnd || prevLastWorkStart.timestamp.getTime() > prevLastWorkEnd.timestamp.getTime()) &&
         !todayHasCrossMidnightEnd;
 
       if (!prevShiftOpen) {
         return ['work_start', 'sick_leave'];
       }
 
-      // Cross-midnight shift still in progress: combine prev+today for lunch/leave state
-      const allTypes = [...prevTypes, ...types];
+      // Cross-midnight shift still in progress:
+      // Only count entries from the current shift (at or after prevLastWorkStart)
+      const prevCurrentEntries = prevEntries.filter(
+        (e) => e.timestamp.getTime() >= prevLastWorkStart.timestamp.getTime(),
+      );
+      const allTypes = [...prevCurrentEntries.map((e) => e.type), ...types];
       const countAll = (t: TimeEntryType) => allTypes.filter((x) => x === t).length;
 
       const lunchOpen = countAll(TimeEntryType.LUNCH_START) > countAll(TimeEntryType.LUNCH_END);
