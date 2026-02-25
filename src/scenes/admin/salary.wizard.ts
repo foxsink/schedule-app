@@ -19,8 +19,11 @@ function formatSalaryResult(r: Awaited<ReturnType<typeof salaryService.calculate
     `Отработано: *${r.totalWorkedHours}ч*`,
     `Начислено: *${r.grossSalary} руб*`,
   ];
-  if (r.bonuses > 0) lines.push(`Премии: +${r.bonuses} руб`);
-  if (r.penalties > 0) lines.push(`Штрафы: -${r.penalties} руб`);
+  for (const a of r.adjustments) {
+    const dateObj = new Date(`${a.date}T00:00:00.000Z`);
+    const sign = a.type === 'BONUS' ? '🎁 +' : '⚠️ −';
+    lines.push(`${sign}${a.amount} руб (${formatDate(dateObj)}) — ${a.reason}`);
+  }
   lines.push('');
   lines.push(`Итого к выплате: *${r.netSalary} руб*`);
   return lines.join('\n');
@@ -68,6 +71,12 @@ async function showSalaryForPeriod(ctx: BotContext, from: Date, to: Date): Promi
     for (const emp of employees) {
       const r = await salaryService.calculateSalary(emp.id, from, to);
       lines.push(`• ${r.lastName} ${r.firstName}: *${r.netSalary} руб* (${r.totalWorkedHours}ч)`);
+      if (r.bonuses > 0 || r.penalties > 0) {
+        const parts: string[] = [];
+        if (r.bonuses > 0) parts.push(`🎁 +${r.bonuses} руб`);
+        if (r.penalties > 0) parts.push(`⚠️ −${r.penalties} руб`);
+        lines.push(`  ${parts.join('  ')}`);
+      }
       grandTotal += r.netSalary;
     }
     lines.push(`\n_Итого: ${Math.round(grandTotal * 100) / 100} руб_`);
