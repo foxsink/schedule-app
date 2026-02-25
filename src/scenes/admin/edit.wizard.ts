@@ -152,14 +152,19 @@ function validateEntryTime(
   const workEnd = sorted.find((e) => e.type === TimeEntryType.WORK_END);
   const T = timestamp.getTime();
 
-  // LUNCH_START must always be before any open absence, regardless of shift state
-  if (type === TimeEntryType.LUNCH_START) {
+  // These checks run for all shifts (open and closed):
+  // LUNCH_START must be before any open absence; PERSONAL_LEAVE_START must be before any open absence too.
+  if (type === TimeEntryType.LUNCH_START || type === TimeEntryType.PERSONAL_LEAVE_START) {
     const leaveStarts = sorted.filter((e) => e.type === TimeEntryType.PERSONAL_LEAVE_START);
     const leaveEnds = sorted.filter((e) => e.type === TimeEntryType.PERSONAL_LEAVE_END);
     if (leaveStarts.length > leaveEnds.length) {
       const unclosedLeave = leaveStarts[leaveEnds.length];
       if (T >= unclosedLeave.timestamp.getTime()) {
-        return `Начало обеда должно быть раньше начала отлучки (${formatTime(unclosedLeave.timestamp)}).`;
+        const msg =
+          type === TimeEntryType.LUNCH_START
+            ? `Начало обеда должно быть раньше начала отлучки (${formatTime(unclosedLeave.timestamp)}).`
+            : `Начало отлучки должно быть раньше уже открытой отлучки (${formatTime(unclosedLeave.timestamp)}).`;
+        return msg;
       }
     }
   }
@@ -197,22 +202,12 @@ function validateEntryTime(
   }
 
   if (type === TimeEntryType.PERSONAL_LEAVE_END) {
-    // Stack-based matching: correctly handles virtual entries injected before existing pairs.
-    // Positional indexing (leaveStarts[leaveEnds.length]) fails when a new start is inserted
-    // before an already-closed pair, causing it to identify the wrong "unclosed" entry.
-    const leaveEvents = sorted.filter(
-      (e) => e.type === TimeEntryType.PERSONAL_LEAVE_START || e.type === TimeEntryType.PERSONAL_LEAVE_END,
-    );
-    const openStack: ShiftEntry[] = [];
-    for (const e of leaveEvents) {
-      if (e.type === TimeEntryType.PERSONAL_LEAVE_START) {
-        openStack.push(e);
-      } else {
-        openStack.pop();
-      }
-    }
-    const unclosed = openStack[openStack.length - 1] ?? null;
-    if (!unclosed) return 'Нет открытой отлучки.';
+    // Positional pairing: leaveStarts[i] pairs with leaveEnds[i].
+    // The first chronologically unmatched start is the one needing its end next.
+    const leaveStarts = sorted.filter((e) => e.type === TimeEntryType.PERSONAL_LEAVE_START);
+    const leaveEnds = sorted.filter((e) => e.type === TimeEntryType.PERSONAL_LEAVE_END);
+    if (leaveStarts.length <= leaveEnds.length) return 'Нет открытой отлучки.';
+    const unclosed = leaveStarts[leaveEnds.length];
     if (T < unclosed.timestamp.getTime()) return 'Возврат должен быть не раньше начала отлучки.';
     const nextEvt = sorted.find((e) => e.timestamp.getTime() > unclosed.timestamp.getTime());
     if (nextEvt && T > nextEvt.timestamp.getTime()) {
@@ -312,7 +307,7 @@ async function showAddTypeMenu(
     const lunchEndBlocked = t === TimeEntryType.LUNCH_END && !onLunch;
     const returnBlocked = t === TimeEntryType.PERSONAL_LEAVE_END && !onLeave;
     const onLunchBlocked = onLunch && t !== TimeEntryType.LUNCH_END && t !== TimeEntryType.PERSONAL_LEAVE_END;
-    const onLeaveBlocked = onLeave && t !== TimeEntryType.PERSONAL_LEAVE_END && t !== TimeEntryType.LUNCH_START && t !== TimeEntryType.LUNCH_END;
+    const onLeaveBlocked = onLeave && t !== TimeEntryType.PERSONAL_LEAVE_END && t !== TimeEntryType.PERSONAL_LEAVE_START && t !== TimeEntryType.LUNCH_START && t !== TimeEntryType.LUNCH_END;
     const blocked = onSickLeave || onLunchBlocked || onLeaveBlocked || requiresWorkStart || workStartCrossMidnight || sickLeaveBlocked || lunchEndBlocked || returnBlocked;
 
     const icon = alreadyDone ? '✅' : blocked ? '❌' : null;
