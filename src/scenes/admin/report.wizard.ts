@@ -3,7 +3,7 @@ import { BotContext } from '../../types/context';
 import { prisma } from '../../prisma';
 import { msToHoursStr } from '../../services/report.service';
 import { salaryService } from '../../services/salary.service';
-import { formatDate, nowUTC7, todayDateUTC7 } from '../../utils/time';
+import { currentWeekUTC7, formatDate, nowUTC7, previousWeekUTC7, todayDateUTC7 } from '../../utils/time';
 import { ADMIN_MENU_SCENE_ID } from './menu.scene';
 import { PERIOD_KEYBOARD } from '../../keyboards/admin.keyboard';
 
@@ -287,10 +287,16 @@ adminReportWizard.action('rpt_yesterday', async (ctx) => {
 adminReportWizard.action('rpt_week', async (ctx) => {
   await ctx.answerCbQuery();
   try { await ctx.editMessageReplyMarkup({ inline_keyboard: [[{ text: '📋 Меню', callback_data: 'go_menu' }]] }); } catch {}
-  const now = nowUTC7();
-  const diff = (now.getUTCDay() + 6) % 7;
-  const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) - diff * 86_400_000);
-  await showReport(ctx, from, todayDateUTC7());
+  const [from, to] = currentWeekUTC7();
+  await showReport(ctx, from, to);
+  return ctx.scene.enter(ADMIN_MENU_SCENE_ID);
+});
+
+adminReportWizard.action('rpt_last_week', async (ctx) => {
+  await ctx.answerCbQuery();
+  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [[{ text: '📋 Меню', callback_data: 'go_menu' }]] }); } catch {}
+  const [from, to] = previousWeekUTC7();
+  await showReport(ctx, from, to);
   return ctx.scene.enter(ADMIN_MENU_SCENE_ID);
 });
 

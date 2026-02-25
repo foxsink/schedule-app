@@ -4,7 +4,7 @@ import { prisma } from '../../prisma';
 import { salaryService } from '../../services/salary.service';
 import { auditService } from '../../services/audit.service';
 import { parseDate } from '../../utils/validation';
-import { formatDate, nowUTC7, todayDateUTC7 } from '../../utils/time';
+import { currentWeekUTC7, formatDate, nowUTC7, previousWeekUTC7, todayDateUTC7 } from '../../utils/time';
 import { AuditAction, AuditEntityType } from '../../generated/prisma/client';
 import { ADMIN_MENU_SCENE_ID } from './menu.scene';
 
@@ -31,7 +31,8 @@ function formatSalaryResult(r: Awaited<ReturnType<typeof salaryService.calculate
 
 const PERIOD_KEYBOARD = Markup.inlineKeyboard([
   [Markup.button.callback('Сегодня', 'sal_today'), Markup.button.callback('Эта неделя', 'sal_week')],
-  [Markup.button.callback('Этот месяц', 'sal_month'), Markup.button.callback('Ввести даты', 'sal_custom')],
+  [Markup.button.callback('Прошлая неделя', 'sal_last_week'), Markup.button.callback('Этот месяц', 'sal_month')],
+  [Markup.button.callback('Ввести даты', 'sal_custom')],
   [Markup.button.callback('« Назад', 'sal_back'), Markup.button.callback('📋 Меню', 'go_menu')],
 ]);
 
@@ -255,10 +256,16 @@ adminSalaryWizard.action('sal_today', async (ctx) => {
 adminSalaryWizard.action('sal_week', async (ctx) => {
   await ctx.answerCbQuery();
   try { await ctx.editMessageReplyMarkup({ inline_keyboard: [[{ text: '📋 Меню', callback_data: 'go_menu' }]] }); } catch {}
-  const now = nowUTC7();
-  const diff = (now.getUTCDay() + 6) % 7;
-  const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) - diff * 86_400_000);
-  await showSalaryForPeriod(ctx, from, todayDateUTC7());
+  const [from, to] = currentWeekUTC7();
+  await showSalaryForPeriod(ctx, from, to);
+  ctx.wizard.selectStep(0);
+});
+
+adminSalaryWizard.action('sal_last_week', async (ctx) => {
+  await ctx.answerCbQuery();
+  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [[{ text: '📋 Меню', callback_data: 'go_menu' }]] }); } catch {}
+  const [from, to] = previousWeekUTC7();
+  await showSalaryForPeriod(ctx, from, to);
   ctx.wizard.selectStep(0);
 });
 

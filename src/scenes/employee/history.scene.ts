@@ -1,7 +1,7 @@
 import { Scenes, Markup } from 'telegraf';
 import { BotContext } from '../../types/context';
 import { prisma } from '../../prisma';
-import { formatDate, formatTime, nowUTC7, todayDateUTC7 } from '../../utils/time';
+import { currentWeekUTC7, formatDate, formatTime, nowUTC7, previousWeekUTC7, todayDateUTC7 } from '../../utils/time';
 import { TimeEntryType } from '../../generated/prisma/client';
 
 export const HISTORY_SCENE_ID = 'employee_history';
@@ -126,9 +126,10 @@ const PERIOD_KEYBOARD = Markup.inlineKeyboard([
   ],
   [
     Markup.button.callback('Эта неделя', 'hist_week'),
-    Markup.button.callback('Этот месяц', 'hist_month'),
+    Markup.button.callback('Прошлая неделя', 'hist_last_week'),
   ],
   [
+    Markup.button.callback('Этот месяц', 'hist_month'),
     Markup.button.callback('Ввести даты', 'hist_custom'),
   ],
   [Markup.button.callback('« Назад', 'hist_back'), Markup.button.callback('📋 Меню', 'go_menu')],
@@ -226,14 +227,16 @@ historyScene.action('hist_week', async (ctx) => {
   await ctx.answerCbQuery();
   try { await ctx.editMessageReplyMarkup({ inline_keyboard: [[{ text: '📋 Меню', callback_data: 'go_menu' }]] }); } catch {}
   if (!ctx.employee) return ctx.scene.leave();
-  const now = nowUTC7();
-  const dayOfWeek = now.getUTCDay();
-  const diff = (dayOfWeek + 6) % 7;
-  const mondayMs =
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) -
-    diff * 86_400_000;
-  const from = new Date(mondayMs);
-  const to = todayDateUTC7();
+  const [from, to] = currentWeekUTC7();
+  await showHistory(ctx, from, to);
+  await ctx.reply('Выберите период:', PERIOD_KEYBOARD);
+});
+
+historyScene.action('hist_last_week', async (ctx) => {
+  await ctx.answerCbQuery();
+  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [[{ text: '📋 Меню', callback_data: 'go_menu' }]] }); } catch {}
+  if (!ctx.employee) return ctx.scene.leave();
+  const [from, to] = previousWeekUTC7();
   await showHistory(ctx, from, to);
   await ctx.reply('Выберите период:', PERIOD_KEYBOARD);
 });

@@ -51,3 +51,18 @@ export function todayDateUTC7(): Date {
   const iso = nowUTC7().toISOString().slice(0, 10);
   return new Date(`${iso}T00:00:00.000Z`);
 }
+
+/** Returns [monday, sunday] of the current UTC+7 week (Mon–Sun). */
+export function currentWeekUTC7(): [Date, Date] {
+  const now = nowUTC7();
+  const diff = (now.getUTCDay() + 6) % 7; // days since Monday
+  const mondayMs = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) - diff * 86_400_000;
+  return [new Date(mondayMs), new Date(mondayMs + 6 * 86_400_000)];
+}
+
+/** Returns [monday, sunday] of the previous UTC+7 week (Mon–Sun). */
+export function previousWeekUTC7(): [Date, Date] {
+  const [mon] = currentWeekUTC7();
+  const prevMondayMs = mon.getTime() - 7 * 86_400_000;
+  return [new Date(prevMondayMs), new Date(prevMondayMs + 6 * 86_400_000)];
+}
