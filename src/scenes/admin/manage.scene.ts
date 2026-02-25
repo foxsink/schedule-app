@@ -68,6 +68,7 @@ async function showEmployeeCard(ctx: BotContext, employeeId: number): Promise<vo
   } else if (emp.role === 'ADMIN') {
     rows.push([Markup.button.callback('👤 Снять права админа', `mgmt_role_employee_${employeeId}`)]);
   }
+  rows.push([Markup.button.callback('✏️ Указать ник Telegram', `mgmt_tgusername_${employeeId}`)]);
   rows.push([Markup.button.callback('🔑 Новый код приглашения', `mgmt_newcode_${employeeId}`)]);
   rows.push([Markup.button.callback('🗑 Удалить сотрудника', `mgmt_delete_${employeeId}`)]);
   rows.push([Markup.button.callback('« К списку', 'mgmt_list'), Markup.button.callback('📋 Меню', 'go_menu')]);
@@ -129,6 +130,29 @@ export const adminManageScene = new Scenes.WizardScene<BotContext>(
         'Введите дату вступления в силу (ДД.ММ.ГГ):',
         Markup.inlineKeyboard([[Markup.button.callback('✗ Отмена', 'mgmt_cancel_input'), Markup.button.callback('📋 Меню', 'go_menu')]]),
       );
+      return;
+    }
+
+    if (meta && meta.startsWith('set_tgusername:')) {
+      const empId = parseInt(meta.slice(15), 10);
+      const raw = ctx.message.text.trim().replace(/^@/, '');
+      if (!/^[a-zA-Z0-9_]{5,32}$/.test(raw)) {
+        await ctx.reply(
+          'Неверный формат. Ник должен содержать 5–32 символа: буквы, цифры, подчёркивание.\nВведите ник (с @ или без):',
+          Markup.inlineKeyboard([[Markup.button.callback('✗ Отмена', 'mgmt_cancel_input'), Markup.button.callback('📋 Меню', 'go_menu')]]),
+        );
+        return;
+      }
+      const old = await prisma.employee.findUnique({ where: { id: empId } });
+      await prisma.employee.update({ where: { id: empId }, data: { telegramUsername: raw } });
+      await auditService.log(editorId, AuditAction.UPDATE, AuditEntityType.EMPLOYEE, empId,
+        { telegramUsername: old?.telegramUsername ?? null },
+        { telegramUsername: raw },
+      );
+      ctx.scene.session.selectedDate = undefined;
+      ctx.wizard.selectStep(0);
+      await ctx.reply(`✅ Ник Telegram обновлён: @${raw}`);
+      await showEmployeeCard(ctx, empId);
       return;
     }
 
@@ -206,6 +230,17 @@ adminManageScene.action(/^mgmt_activate_(\d+)$/, async (ctx) => {
   await auditService.log(editorId, AuditAction.UPDATE, AuditEntityType.EMPLOYEE, empId, { isActive: false }, { isActive: true });
   await ctx.reply('✅ Сотрудник активирован.');
   await showEmployeeCard(ctx, empId);
+});
+
+adminManageScene.action(/^mgmt_tgusername_(\d+)$/, async (ctx) => {
+  await ctx.answerCbQuery();
+  const empId = parseInt(ctx.match[1], 10);
+  ctx.scene.session.selectedDate = `set_tgusername:${empId}`;
+  ctx.wizard.selectStep(1);
+  await ctx.reply(
+    'Введите ник Telegram сотрудника (с @ или без):',
+    Markup.inlineKeyboard([[Markup.button.callback('✗ Отмена', 'mgmt_cancel_input'), Markup.button.callback('📋 Меню', 'go_menu')]]),
+  );
 });
 
 adminManageScene.action(/^mgmt_newcode_(\d+)$/, async (ctx) => {
@@ -288,7 +323,7 @@ adminManageScene.action('mgmt_cancel_input', async (ctx) => {
   const meta = ctx.scene.session.selectedDate;
   ctx.scene.session.selectedDate = undefined;
   ctx.wizard.selectStep(0);
-  if (meta && (meta.startsWith('set_rate:') || meta.startsWith('set_rate2:'))) {
+  if (meta && (meta.startsWith('set_rate:') || meta.startsWith('set_rate2:') || meta.startsWith('set_tgusername:'))) {
     const empId = parseInt(meta.split(':')[1], 10);
     await showEmployeeCard(ctx, empId);
   } else {
