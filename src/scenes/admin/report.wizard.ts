@@ -64,7 +64,29 @@ async function showReport(ctx: BotContext, from: Date, to: Date): Promise<void> 
       hasData = true;
       totalNet += r.netSalary;
       lines.push(`👤 *${r.lastName} ${r.firstName}*`);
-      lines.push(`  ⏱ ${hoursStr(r.totalWorkedHours)} → ${fmtMoney(r.grossSalary)}`);
+
+      for (const d of r.days) {
+        const dateObj = new Date(`${d.date}T00:00:00.000Z`);
+        const dayName = DAY_NAMES[dateObj.getUTCDay()];
+        lines.push(`  📅 *${formatDate(dateObj)} (${dayName})*`);
+        if (d.sickLeave) {
+          lines.push('    🏥 Больничный');
+        } else {
+          lines.push(`    🕐 ${d.workStart} – ${d.workEnd}`);
+          if (d.lunchStart && d.lunchEnd) lines.push(`    🍽 ${d.lunchStart} – ${d.lunchEnd}`);
+          lines.push(`    ⏱ ${hoursStr(d.netHours)} × ${fmtMoney(d.rate)}/ч = *${fmtMoney(d.amount)}*`);
+        }
+      }
+
+      if (r.adjustments.length > 0) {
+        for (const a of r.adjustments) {
+          const dateObj = new Date(`${a.date}T00:00:00.000Z`);
+          const sign = a.type === 'BONUS' ? '➕' : '➖';
+          lines.push(`  ${sign} ${formatDate(dateObj)}: *${fmtMoney(a.amount)}* — ${a.reason}`);
+        }
+      }
+
+      lines.push(`  ⏱ Отработано: ${hoursStr(r.totalWorkedHours)} → 💵 ${fmtMoney(r.grossSalary)}`);
       if (r.bonuses > 0) lines.push(`  ➕ Премии: ${fmtMoney(r.bonuses)}`);
       if (r.penalties > 0) lines.push(`  ➖ Штрафы: ${fmtMoney(r.penalties)}`);
       lines.push(`  💰 К выплате: *${fmtMoney(r.netSalary)}*`);
