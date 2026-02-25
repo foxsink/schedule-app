@@ -299,8 +299,8 @@ async function showAddTypeMenu(
     // Use combined onLunch/onLeave for accurate cross-midnight blocking
     const lunchEndBlocked = t === TimeEntryType.LUNCH_END && !onLunch;
     const returnBlocked = t === TimeEntryType.PERSONAL_LEAVE_END && !onLeave;
-    const onLunchBlocked = onLunch && t !== TimeEntryType.LUNCH_END;
-    const onLeaveBlocked = onLeave && t !== TimeEntryType.PERSONAL_LEAVE_END && t !== TimeEntryType.LUNCH_START;
+    const onLunchBlocked = onLunch && t !== TimeEntryType.LUNCH_END && t !== TimeEntryType.PERSONAL_LEAVE_END;
+    const onLeaveBlocked = onLeave && t !== TimeEntryType.PERSONAL_LEAVE_END && t !== TimeEntryType.LUNCH_START && t !== TimeEntryType.LUNCH_END;
     const blocked = onSickLeave || onLunchBlocked || onLeaveBlocked || requiresWorkStart || workStartCrossMidnight || sickLeaveBlocked || lunchEndBlocked || returnBlocked;
 
     const icon = alreadyDone ? '✅' : blocked ? '❌' : null;
