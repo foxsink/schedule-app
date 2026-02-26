@@ -1,6 +1,6 @@
 import { prisma } from '../prisma';
 import { generateInvitationCode } from '../utils/invitation';
-import { Role } from '../generated/prisma/client';
+import { Employee, Role } from '../generated/prisma/client';
 
 export const employeeService = {
   async findByTelegramId(telegramId: bigint) {
@@ -45,5 +45,13 @@ export const employeeService = {
 
   async generateInvitationCode() {
     return generateInvitationCode();
+  },
+
+  async updateProfile(employeeId: number, data: {
+    phone?: string | null;
+    address?: string | null;
+    emergencyPhone?: string | null;
+  }): Promise<Employee> {
+    return prisma.employee.update({ where: { id: employeeId }, data });
   },
 };

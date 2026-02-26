@@ -16,6 +16,7 @@ export interface SessionData extends Scenes.WizardSessionData {
   notifFilterTo?: string;
   notifFilterStep?: number;    // 1 | 2 | 3 (wizard step)
   notifFilterEmpPage?: number; // pagination page for step 1 employee list
+  profileWaitingFor?: 'phone' | 'address' | 'emergency';
 }
 
 export interface BotContext extends Context {

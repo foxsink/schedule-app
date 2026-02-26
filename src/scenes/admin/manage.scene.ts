@@ -72,6 +72,9 @@ async function showEmployeeCard(ctx: BotContext, employeeId: number): Promise<vo
   const codeStr = emp.invitationCode ? `Код: \`${emp.invitationCode}\`` : 'код использован';
 
   const roleStr = emp.role === 'SUPER_ADMIN' ? '👑 Супер-админ' : emp.role === 'ADMIN' ? '🔧 Админ' : '👤 Сотрудник';
+  const phoneStr = emp.phone ?? 'не указан';
+  const addressStr = emp.address ?? 'не указан';
+  const emergencyStr = emp.emergencyPhone ?? 'не указан';
   const lines = [
     `👤 *${emp.lastName} ${emp.firstName}*`,
     `Роль: ${roleStr}`,
@@ -79,6 +82,9 @@ async function showEmployeeCard(ctx: BotContext, employeeId: number): Promise<vo
     `Telegram: ${tgStr}`,
     `${codeStr}`,
     `Ставка: ${rateStr}`,
+    `📱 Телефон: ${phoneStr}`,
+    `🏠 Адрес: ${addressStr}`,
+    `🆘 Экстренный: ${emergencyStr}`,
   ];
 
   const rows: ReturnType<typeof Markup.button.callback>[][] = [
@@ -95,6 +101,11 @@ async function showEmployeeCard(ctx: BotContext, employeeId: number): Promise<vo
     rows.push([Markup.button.callback('👤 Снять права админа', `mgmt_role_employee_${employeeId}`)]);
   }
   rows.push([Markup.button.callback('✏️ Указать ник Telegram', `mgmt_tgusername_${employeeId}`)]);
+  rows.push([
+    Markup.button.callback('📱 Телефон', `mgmt_phone_${employeeId}`),
+    Markup.button.callback('🏠 Адрес', `mgmt_address_${employeeId}`),
+    Markup.button.callback('🆘 Экстренный', `mgmt_emergency_${employeeId}`),
+  ]);
   rows.push([Markup.button.callback('🔑 Новый код приглашения', `mgmt_newcode_${employeeId}`)]);
   rows.push([Markup.button.callback('« К списку', 'mgmt_list'), Markup.button.callback('📋 Меню', 'go_menu')]);
 
@@ -177,6 +188,54 @@ export const adminManageScene = new Scenes.WizardScene<BotContext>(
       ctx.scene.session.selectedDate = undefined;
       ctx.wizard.selectStep(0);
       await ctx.reply(`✅ Ник Telegram обновлён: @${raw}`);
+      await showEmployeeCard(ctx, empId);
+      return;
+    }
+
+    if (meta && meta.startsWith('set_phone:')) {
+      const empId = parseInt(meta.slice(10), 10);
+      const phone = ctx.message.text.trim();
+      const old = await prisma.employee.findUnique({ where: { id: empId } });
+      await employeeService.updateProfile(empId, { phone });
+      await auditService.log(editorId, AuditAction.UPDATE, AuditEntityType.EMPLOYEE, empId,
+        { phone: old?.phone ?? null },
+        { phone },
+      );
+      ctx.scene.session.selectedDate = undefined;
+      ctx.wizard.selectStep(0);
+      await ctx.reply(`✅ Телефон обновлён: ${phone}`);
+      await showEmployeeCard(ctx, empId);
+      return;
+    }
+
+    if (meta && meta.startsWith('set_address:')) {
+      const empId = parseInt(meta.slice(12), 10);
+      const address = ctx.message.text.trim();
+      const old = await prisma.employee.findUnique({ where: { id: empId } });
+      await employeeService.updateProfile(empId, { address });
+      await auditService.log(editorId, AuditAction.UPDATE, AuditEntityType.EMPLOYEE, empId,
+        { address: old?.address ?? null },
+        { address },
+      );
+      ctx.scene.session.selectedDate = undefined;
+      ctx.wizard.selectStep(0);
+      await ctx.reply(`✅ Адрес обновлён: ${address}`);
+      await showEmployeeCard(ctx, empId);
+      return;
+    }
+
+    if (meta && meta.startsWith('set_emergency:')) {
+      const empId = parseInt(meta.slice(14), 10);
+      const emergencyPhone = ctx.message.text.trim();
+      const old = await prisma.employee.findUnique({ where: { id: empId } });
+      await employeeService.updateProfile(empId, { emergencyPhone });
+      await auditService.log(editorId, AuditAction.UPDATE, AuditEntityType.EMPLOYEE, empId,
+        { emergencyPhone: old?.emergencyPhone ?? null },
+        { emergencyPhone },
+      );
+      ctx.scene.session.selectedDate = undefined;
+      ctx.wizard.selectStep(0);
+      await ctx.reply(`✅ Экстренный контакт обновлён: ${emergencyPhone}`);
       await showEmployeeCard(ctx, empId);
       return;
     }
@@ -303,12 +362,46 @@ adminManageScene.action(/^mgmt_role_employee_(\d+)$/, async (ctx) => {
 });
 
 
+adminManageScene.action(/^mgmt_phone_(\d+)$/, async (ctx) => {
+  await ctx.answerCbQuery();
+  const empId = parseInt(ctx.match[1], 10);
+  ctx.scene.session.selectedDate = `set_phone:${empId}`;
+  ctx.wizard.selectStep(1);
+  await ctx.reply(
+    'Введите номер телефона сотрудника:',
+    Markup.inlineKeyboard([[Markup.button.callback('✗ Отмена', 'mgmt_cancel_input'), Markup.button.callback('📋 Меню', 'go_menu')]]),
+  );
+});
+
+adminManageScene.action(/^mgmt_address_(\d+)$/, async (ctx) => {
+  await ctx.answerCbQuery();
+  const empId = parseInt(ctx.match[1], 10);
+  ctx.scene.session.selectedDate = `set_address:${empId}`;
+  ctx.wizard.selectStep(1);
+  await ctx.reply(
+    'Введите адрес сотрудника:',
+    Markup.inlineKeyboard([[Markup.button.callback('✗ Отмена', 'mgmt_cancel_input'), Markup.button.callback('📋 Меню', 'go_menu')]]),
+  );
+});
+
+adminManageScene.action(/^mgmt_emergency_(\d+)$/, async (ctx) => {
+  await ctx.answerCbQuery();
+  const empId = parseInt(ctx.match[1], 10);
+  ctx.scene.session.selectedDate = `set_emergency:${empId}`;
+  ctx.wizard.selectStep(1);
+  await ctx.reply(
+    'Введите экстренный контакт (имя и номер):',
+    Markup.inlineKeyboard([[Markup.button.callback('✗ Отмена', 'mgmt_cancel_input'), Markup.button.callback('📋 Меню', 'go_menu')]]),
+  );
+});
+
 adminManageScene.action('mgmt_cancel_input', async (ctx) => {
   await ctx.answerCbQuery();
   const meta = ctx.scene.session.selectedDate;
   ctx.scene.session.selectedDate = undefined;
   ctx.wizard.selectStep(0);
-  if (meta && (meta.startsWith('set_rate:') || meta.startsWith('set_rate2:') || meta.startsWith('set_tgusername:'))) {
+  const empPrefixes = ['set_rate:', 'set_rate2:', 'set_tgusername:', 'set_phone:', 'set_address:', 'set_emergency:'];
+  if (meta && empPrefixes.some((p) => meta.startsWith(p))) {
     const empId = parseInt(meta.split(':')[1], 10);
     await showEmployeeCard(ctx, empId);
   } else {

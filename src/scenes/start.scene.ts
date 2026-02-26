@@ -3,6 +3,7 @@ import { BotContext } from '../types/context';
 import { employeeService } from '../services/employee.service';
 import { EMPLOYEE_MENU_SCENE_ID } from './employee/menu.scene';
 import { ADMIN_MENU_SCENE_ID } from './admin/menu.scene';
+import { ONBOARDING_SCENE_ID } from './employee/onboarding.scene';
 
 export const START_SCENE_ID = 'start';
 
@@ -48,8 +49,9 @@ export const startScene = new Scenes.WizardScene<BotContext>(
       return ctx.scene.leave();
     }
 
-    await employeeService.linkTelegram(employee.id, BigInt(ctx.from.id), ctx.from.username);
-    await ctx.reply(`Добро пожаловать, ${employee.firstName} ${employee.lastName}! Вы успешно авторизованы.`);
-    return ctx.scene.enter(EMPLOYEE_MENU_SCENE_ID);
+    const linked = await employeeService.linkTelegram(employee.id, BigInt(ctx.from.id), ctx.from.username);
+    ctx.employee = linked;
+    await ctx.reply(`Добро пожаловать, ${employee.firstName}! Вы успешно авторизованы.`);
+    return ctx.scene.enter(ONBOARDING_SCENE_ID);
   }
 );
