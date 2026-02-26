@@ -6,6 +6,14 @@ export interface SessionData extends Scenes.WizardSessionData {
   selectedDate?: string;
   selectedPeriodFrom?: string;
   selectedPeriodTo?: string;
+  // Notification feed state
+  notifPage?: number;
+  notifTab?: 'all' | 'bookmarks';
+  notifFilterMode?: 'settings' | 'custom';
+  notifFilterEmpId?: number;
+  notifFilterTypes?: string;  // CSV of TimeEntryType, '' = all
+  notifFilterFrom?: string;   // YYYY-MM-DD
+  notifFilterTo?: string;
 }
 
 export interface BotContext extends Context {
