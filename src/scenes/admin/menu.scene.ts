@@ -1,5 +1,7 @@
 import { Scenes, Markup } from 'telegraf';
 import { BotContext } from '../../types/context';
+import { notificationService } from '../../services/notification.service';
+import { ADMIN_NOTIFICATIONS_SCENE_ID } from './notifications.scene';
 
 export const ADMIN_MENU_SCENE_ID = 'admin_menu';
 
@@ -12,6 +14,8 @@ adminMenuScene.enter(async (ctx) => {
   }
 
   const isSuperAdmin = ctx.employee.role === 'SUPER_ADMIN';
+  const unreadCount = await notificationService.getUnreadCount(ctx.employee.id);
+  const notifLabel = unreadCount > 0 ? `🔔 Уведомления (${unreadCount})` : '🔔 Уведомления';
 
   const rows = [
     [Markup.button.callback('Расписание', 'admin_schedule')],
@@ -20,6 +24,7 @@ adminMenuScene.enter(async (ctx) => {
     [Markup.button.callback('Сотрудники', 'admin_employees')],
     [Markup.button.callback('Зарплаты', 'admin_salaries')],
     [Markup.button.callback('Экспорт', 'admin_export')],
+    [Markup.button.callback(notifLabel, 'admin_notifications')],
     [Markup.button.callback('👤 Режим сотрудника', 'admin_to_employee')],
   ];
   if (isSuperAdmin) {
@@ -69,6 +74,12 @@ adminMenuScene.action('admin_audit', async (ctx) => {
   await ctx.answerCbQuery();
   try { await ctx.editMessageReplyMarkup({ inline_keyboard: [[{ text: '📋 Меню', callback_data: 'go_menu' }]] }); } catch {}
   return ctx.scene.enter('admin_audit');
+});
+
+adminMenuScene.action('admin_notifications', async (ctx) => {
+  await ctx.answerCbQuery();
+  try { await ctx.editMessageReplyMarkup({ inline_keyboard: [[{ text: '📋 Меню', callback_data: 'go_menu' }]] }); } catch {}
+  return ctx.scene.enter(ADMIN_NOTIFICATIONS_SCENE_ID);
 });
 
 adminMenuScene.action('admin_to_employee', async (ctx) => {

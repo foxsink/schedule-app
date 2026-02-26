@@ -15,6 +15,8 @@ import { adminManageScene } from './scenes/admin/manage.scene';
 import { adminSalaryWizard } from './scenes/admin/salary.wizard';
 import { adminExportWizard } from './scenes/admin/export.wizard';
 import { adminAuditScene } from './scenes/admin/audit.scene';
+import { adminNotificationsScene } from './scenes/admin/notifications.scene';
+import { adminNotifSettingsScene } from './scenes/admin/notif-settings.scene';
 
 function getMainMenuSceneId(role?: string): string {
   return role === 'ADMIN' || role === 'SUPER_ADMIN'
@@ -37,6 +39,8 @@ export function createBot(): Telegraf<BotContext> {
     adminSalaryWizard,
     adminExportWizard,
     adminAuditScene,
+    adminNotificationsScene,
+    adminNotifSettingsScene,
   ]);
 
   bot.use(sessionMiddleware);
