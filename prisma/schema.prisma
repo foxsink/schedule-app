@@ -54,10 +54,14 @@ model Employee {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  timeEntries        TimeEntry[]
-  rates              EmployeeRate[]
-  salaryAdjustments  SalaryAdjustment[]
-  auditLogs          AuditLog[]          @relation("editor")
+  timeEntries             TimeEntry[]
+  rates                   EmployeeRate[]
+  salaryAdjustments       SalaryAdjustment[]
+  auditLogs               AuditLog[]                  @relation("editor")
+  notifications           Notification[]
+  notificationReads       NotificationRead[]
+  notificationSettings    AdminNotificationSettings?
+  notificationFilters     AdminNotificationFilter[]
 }
 
 model EmployeeRate {
@@ -117,4 +121,63 @@ model AuditLog {
   @@index([entityType, entityId])
   @@index([editorId])
   @@index([createdAt])
+}
+
+model Notification {
+  id         Int           @id @default(autoincrement())
+  employeeId Int
+  type       TimeEntryType
+  timestamp  DateTime
+  createdAt  DateTime      @default(now())
+
+  employee   Employee           @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  reads      NotificationRead[]
+
+  @@index([createdAt])
+  @@index([employeeId, createdAt])
+}
+
+model NotificationRead {
+  id             Int      @id @default(autoincrement())
+  notificationId Int
+  adminId        Int
+  readAt         DateTime @default(now())
+  bookmarked     Boolean  @default(false)
+
+  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  admin          Employee     @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@unique([notificationId, adminId])
+  @@index([adminId])
+  @@index([adminId, bookmarked])
+}
+
+model AdminNotificationSettings {
+  id                       Int      @id @default(autoincrement())
+  adminId                  Int      @unique
+  pushEnabled              Boolean  @default(true)
+  notifyWorkStart          Boolean  @default(true)
+  notifyWorkEnd            Boolean  @default(true)
+  notifyLunchStart         Boolean  @default(true)
+  notifyLunchEnd           Boolean  @default(true)
+  notifyPersonalLeaveStart Boolean  @default(true)
+  notifyPersonalLeaveEnd   Boolean  @default(true)
+  notifySickLeave          Boolean  @default(true)
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  admin           Employee                  @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  employeeFilters AdminNotificationFilter[]
+}
+
+model AdminNotificationFilter {
+  id         Int @id @default(autoincrement())
+  settingsId Int
+  employeeId Int
+
+  settings AdminNotificationSettings @relation(fields: [settingsId], references: [id], onDelete: Cascade)
+  employee Employee                  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([settingsId, employeeId])
+  @@index([settingsId])
 }
