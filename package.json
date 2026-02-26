@@ -14,9 +14,9 @@
   "dependencies": {
     "@prisma/adapter-pg": "^7.4.1",
     "@prisma/client": "^7.4.1",
+    "@xlsx/xlsx-populate": "^0.2.0",
     "dotenv": "^16.4.5",
-    "telegraf": "^4.16.3",
-    "xlsx-populate": "^1.21.0"
+    "telegraf": "^4.16.3"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",

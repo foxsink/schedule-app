@@ -1,18 +1,17 @@
-import XlsxPopulate from 'xlsx-populate';
+import { Workbook } from '@xlsx/xlsx-populate';
+import type { Sheet } from '@xlsx/xlsx-populate';
 import { prisma } from '../prisma';
 import { salaryService } from './salary.service';
 import { formatDate } from '../utils/time';
 import { TimeEntryType } from '../generated/prisma/client';
 
-type XlsSheet = ReturnType<Awaited<ReturnType<typeof XlsxPopulate.fromBlankAsync>>['sheet']>;
+const HEADER_FILL = { type: 'solid' as const, color: { rgb: 'D9E1F2' } };
+const COLOR_GREEN = { rgb: '2E7D32' };
+const COLOR_RED   = { rgb: 'C62828' };
 
-const HEADER_FILL = { type: 'solid' as const, color: 'D9E1F2' };
-const COLOR_GREEN = '2E7D32';
-const COLOR_RED   = 'C62828';
-
-function setupHeaders(sheet: XlsSheet, headers: string[], widths: number[]) {
+function setupHeaders(sheet: Sheet, headers: string[], widths: number[]) {
   headers.forEach((h, i) => {
-    sheet.cell(1, i + 1).value(h).style({ bold: true, fill: HEADER_FILL });
+    sheet.cell(1, i + 1).value(h).style((s) => { s.bold(true); s.fill(HEADER_FILL); });
     sheet.column(i + 1).width(widths[i]);
   });
 }
@@ -28,22 +27,23 @@ export const excelService = {
       employees.map((e) => salaryService.calculateSalary(e.id, from, to))
     );
 
-    const wb = await XlsxPopulate.fromBlankAsync();
+    const wb = await Workbook.fromBlank();
 
     // ── Sheet 1: Зарплаты ──────────────────────────────────────────────────────
-    const salarySheet = wb.sheet(0);
-    salarySheet.name('Зарплаты');
+    // fromBlank() always provides at least one sheet; cast away the potential undefined
+    const salarySheet = wb.sheet(0)!.name('Зарплаты');
 
-    const SALARY_HEADERS  = ['Сотрудник', 'Часы', 'Ставка (руб/ч)', 'Начислено', 'Премии', 'Штрафы', 'Итого'];
-    const SALARY_WIDTHS   = [25, 10, 16, 14, 12, 12, 14];
-    setupHeaders(salarySheet, SALARY_HEADERS, SALARY_WIDTHS);
+    setupHeaders(salarySheet,
+      ['Сотрудник', 'Часы', 'Ставка (руб/ч)', 'Начислено', 'Премии', 'Штрафы', 'Итого'],
+      [25, 10, 16, 14, 12, 12, 14],
+    );
 
     let salaryRow = 2;
     for (const r of results) {
       const avgRate = r.totalWorkedHours > 0
         ? Math.round((r.grossSalary / r.totalWorkedHours) * 100) / 100
         : 0;
-      const vals = [
+      [
         `${r.lastName} ${r.firstName}`,
         r.totalWorkedHours,
         avgRate,
@@ -51,31 +51,30 @@ export const excelService = {
         r.bonuses,
         r.penalties,
         r.netSalary,
-      ];
-      vals.forEach((v, i) => salarySheet.cell(salaryRow, i + 1).value(v));
+      ].forEach((v, i) => salarySheet.cell(salaryRow, i + 1).value(v));
       salaryRow++;
     }
 
     // Totals row
     const totalsRowNum = salaryRow;
-    const totalsVals = [
+    [
       'ИТОГО',
       results.reduce((s, r) => s + r.totalWorkedHours, 0),
-      '',
+      null,
       results.reduce((s, r) => s + r.grossSalary, 0),
       results.reduce((s, r) => s + r.bonuses, 0),
       results.reduce((s, r) => s + r.penalties, 0),
       results.reduce((s, r) => s + r.netSalary, 0),
-    ];
-    totalsVals.forEach((v, i) => salarySheet.cell(totalsRowNum, i + 1).value(v !== '' ? v : null));
-    salarySheet.range(`A${totalsRowNum}:G${totalsRowNum}`).style({ bold: true });
+    ].forEach((v, i) => salarySheet.cell(totalsRowNum, i + 1).value(v));
+    salarySheet.range(`A${totalsRowNum}:G${totalsRowNum}`).style((s) => s.bold(true));
 
     // ── Sheet 2: Детализация ───────────────────────────────────────────────────
     const detailSheet = wb.addSheet('Детализация');
 
-    const DETAIL_HEADERS = ['Дата', 'Сотрудник', 'Начало', 'Конец', 'Обед (ч)', 'Отлучки (ч)', 'Часы', 'Ставка', 'Сумма', 'Премии', 'Штрафы'];
-    const DETAIL_WIDTHS  = [14, 25, 10, 10, 10, 12, 8, 10, 12, 12, 12];
-    setupHeaders(detailSheet, DETAIL_HEADERS, DETAIL_WIDTHS);
+    setupHeaders(detailSheet,
+      ['Дата', 'Сотрудник', 'Начало', 'Конец', 'Обед (ч)', 'Отлучки (ч)', 'Часы', 'Ставка', 'Сумма', 'Премии', 'Штрафы'],
+      [14, 25, 10, 10, 10, 12, 8, 10, 12, 12, 12],
+    );
 
     let detailRow = 2;
     for (const result of results) {
@@ -114,10 +113,10 @@ export const excelService = {
           leavesMs += plEnds[i].timestamp.getTime() - plStarts[i].timestamp.getTime();
         }
 
-        const isSick  = entries.some((e) => e.type === TimeEntryType.SICK_LEAVE);
-        const dayAdj  = adjByDate.get(day.date);
+        const isSick = entries.some((e) => e.type === TimeEntryType.SICK_LEAVE);
+        const dayAdj = adjByDate.get(day.date);
 
-        const vals: unknown[] = [
+        [
           formatDate(date),
           `${result.lastName} ${result.firstName}`,
           day.workStart ?? (isSick ? 'Больничный' : '—'),
@@ -129,8 +128,7 @@ export const excelService = {
           day.amount   || null,
           dayAdj?.bonuses   || null,
           dayAdj?.penalties || null,
-        ];
-        vals.forEach((v, i) => detailSheet.cell(detailRow, i + 1).value(v));
+        ].forEach((v, i) => detailSheet.cell(detailRow, i + 1).value(v));
         detailRow++;
       }
     }
@@ -138,9 +136,10 @@ export const excelService = {
     // ── Sheet 3: Корректировки ─────────────────────────────────────────────────
     const adjSheet = wb.addSheet('Корректировки');
 
-    const ADJ_HEADERS = ['Дата', 'Сотрудник', 'Тип', 'Сумма', 'Описание'];
-    const ADJ_WIDTHS  = [14, 25, 12, 12, 40];
-    setupHeaders(adjSheet, ADJ_HEADERS, ADJ_WIDTHS);
+    setupHeaders(adjSheet,
+      ['Дата', 'Сотрудник', 'Тип', 'Сумма', 'Описание'],
+      [14, 25, 12, 12, 40],
+    );
 
     let adjRow = 2;
     for (const result of results) {
@@ -149,22 +148,20 @@ export const excelService = {
         const isBonus = a.type === 'BONUS';
         const color   = isBonus ? COLOR_GREEN : COLOR_RED;
 
-        const vals = [
+        [
           formatDate(dateObj),
           `${result.lastName} ${result.firstName}`,
           isBonus ? 'Премия' : 'Штраф',
           a.amount,
           a.reason,
-        ];
-        vals.forEach((v, i) => adjSheet.cell(adjRow, i + 1).value(v));
+        ].forEach((v, i) => adjSheet.cell(adjRow, i + 1).value(v));
         // Highlight type and amount cells
-        adjSheet.cell(adjRow, 3).style({ fontColor: color });
-        adjSheet.cell(adjRow, 4).style({ fontColor: color });
+        adjSheet.cell(adjRow, 3).style((s) => s.fontColor(color));
+        adjSheet.cell(adjRow, 4).style((s) => s.fontColor(color));
         adjRow++;
       }
     }
 
-    const buf = await wb.outputAsync();
-    return Buffer.from(buf as ArrayBuffer);
+    return wb.output('node:buffer');
   },
 };
