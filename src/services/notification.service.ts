@@ -27,7 +27,19 @@ const RU_MONTHS = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', '
 
 const PAGE_SIZE = 10;
 
+// Tracks the last push message per admin to remove the menu button when a new one arrives.
+// In-memory only: on restart old buttons remain, but new messages work correctly.
+const lastPushMsg = new Map<number, { chatId: string; messageId: number }>();
+
 export const notificationService = {
+
+  getLastPushMsg(adminId: number) {
+    return lastPushMsg.get(adminId);
+  },
+
+  setLastPushMsg(adminId: number, chatId: string, messageId: number) {
+    lastPushMsg.set(adminId, { chatId, messageId });
+  },
 
   async createNotification(employeeId: number, type: TimeEntryType, timestamp: Date): Promise<Notification> {
     return prisma.notification.create({

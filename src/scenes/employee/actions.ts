@@ -66,8 +66,18 @@ export function registerEmployeeActions(bot: Telegraf<BotContext>) {
           const menuButton = Markup.inlineKeyboard([[Markup.button.callback('📋 Меню', 'go_menu')]]);
           for (const admin of admins) {
             if (!admin.telegramId) continue;
-            try { await ctx.telegram.sendMessage(admin.telegramId.toString(), text, menuButton); }
-            catch {}
+            const chatId = admin.telegramId.toString();
+            // Remove menu button from previous notification for this admin
+            const prev = notificationService.getLastPushMsg(admin.id);
+            if (prev) {
+              try { await ctx.telegram.editMessageReplyMarkup(prev.chatId, prev.messageId, undefined, { inline_keyboard: [] }); }
+              catch {}
+            }
+            // Send new notification with menu button, store its message_id
+            try {
+              const sent = await ctx.telegram.sendMessage(chatId, text, menuButton);
+              notificationService.setLastPushMsg(admin.id, chatId, sent.message_id);
+            } catch {}
           }
         })
         .catch(() => {});
