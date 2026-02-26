@@ -10,10 +10,11 @@ export interface SessionData extends Scenes.WizardSessionData {
   notifPage?: number;
   notifTab?: 'all' | 'bookmarks';
   notifFilterMode?: 'settings' | 'custom';
-  notifFilterEmpId?: number;
-  notifFilterTypes?: string;  // CSV of TimeEntryType, '' = all
-  notifFilterFrom?: string;   // YYYY-MM-DD
+  notifFilterEmpIds?: string;  // CSV of employee IDs, '' = all
+  notifFilterTypes?: string;   // CSV of TimeEntryType, '' = all
+  notifFilterFrom?: string;    // YYYY-MM-DD
   notifFilterTo?: string;
+  notifFilterStep?: number;    // 1 | 2 | 3 (wizard step)
 }
 
 export interface BotContext extends Context {

@@ -132,7 +132,7 @@ export const notificationService = {
     adminId: number,
     page: number,
     useFilter: boolean,
-    filterEmpId?: number,
+    filterEmpIds?: string,
     filterTypes?: string,
     filterFrom?: string,
     filterTo?: string,
@@ -156,8 +156,8 @@ export const notificationService = {
       }
     } else {
       // custom filter mode
-      if (filterEmpId !== undefined) {
-        where['employeeId'] = filterEmpId;
+      if (filterEmpIds && filterEmpIds.length > 0) {
+        where['employeeId'] = { in: filterEmpIds.split(',').map(Number) };
       }
       if (filterTypes && filterTypes.length > 0) {
         where['type'] = { in: filterTypes.split(',') as TimeEntryType[] };
