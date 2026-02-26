@@ -129,6 +129,9 @@ async function renderFeed(ctx: BotContext) {
       Markup.button.callback('⚙️ Фильтр ленты', 'nf_filter_open'),
       Markup.button.callback('✅ Всё прочитано', 'nf_mark_all'),
     ]);
+    if (filterMode === 'custom') {
+      keyboard.push([Markup.button.callback('🔄 Сбросить фильтр', 'nf_filter_reset')]);
+    }
   }
 
   const navRow: ReturnType<typeof Markup.button.callback>[] = [];
@@ -185,10 +188,7 @@ async function renderStep1(ctx: BotContext) {
     Markup.button.callback('🗑 Очистить', 'nf_s1_clear'),
     Markup.button.callback('Далее →', 'nf_s1_next'),
   ]);
-  keyboard.push([
-    Markup.button.callback('🔄 Сбросить', 'nf_filter_reset'),
-    Markup.button.callback('← Отмена', 'nf_filter_cancel'),
-  ]);
+  keyboard.push([Markup.button.callback('← Отмена', 'nf_filter_cancel')]);
 
   return { text, keyboard };
 }
@@ -215,7 +215,6 @@ function renderStep2(ctx: BotContext) {
     Markup.button.callback('← Назад', 'nf_s2_prev'),
     Markup.button.callback('Далее →', 'nf_s2_next'),
   ]);
-  keyboard.push([Markup.button.callback('🔄 Сбросить', 'nf_filter_reset')]);
 
   return { text, keyboard };
 }
@@ -259,7 +258,6 @@ function renderStep3(ctx: BotContext) {
     Markup.button.callback('← Назад', 'nf_s3_prev'),
     Markup.button.callback('✅ Применить', 'nf_s3_apply'),
   ]);
-  keyboard.push([Markup.button.callback('🔄 Сбросить', 'nf_filter_reset')]);
 
   return { text, keyboard };
 }
