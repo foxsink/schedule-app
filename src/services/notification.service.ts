@@ -38,28 +38,34 @@ export const notificationService = {
   async getAdminsToPush(employeeId: number, type: TimeEntryType): Promise<Employee[]> {
     const pushField = TYPE_TO_PUSH_FIELD[type];
 
-    const settingsList = await prisma.adminNotificationSettings.findMany({
+    // Query all eligible admins and left-join their settings.
+    // Admins without a settings record are treated as "all defaults on".
+    const admins = await prisma.employee.findMany({
       where: {
-        pushEnabled: true,
-        [pushField]: true,
-        admin: {
-          isActive: true,
-          role: { in: ['ADMIN', 'SUPER_ADMIN'] },
-          telegramId: { not: null },
-          id: { not: employeeId },
-        },
+        isActive: true,
+        role: { in: ['ADMIN', 'SUPER_ADMIN'] },
+        telegramId: { not: null },
+        id: { not: employeeId },
       },
       include: {
-        admin: true,
-        employeeFilters: true,
+        notificationSettings: {
+          include: { employeeFilters: true },
+        },
       },
     });
 
     const eligible: Employee[] = [];
-    for (const s of settingsList) {
-      if (s.employeeFilters.length === 0 || s.employeeFilters.some(f => f.employeeId === employeeId)) {
-        eligible.push(s.admin);
+    for (const admin of admins) {
+      const s = admin.notificationSettings;
+      // No settings record → defaults (all enabled, no employee filter)
+      if (!s) {
+        eligible.push(admin);
+        continue;
       }
+      if (!s.pushEnabled) continue;
+      if (!s[pushField as keyof typeof s]) continue;
+      if (s.employeeFilters.length > 0 && !s.employeeFilters.some(f => f.employeeId === employeeId)) continue;
+      eligible.push(admin);
     }
     return eligible;
   },
