@@ -49,7 +49,7 @@ function ss(ctx: BotContext) {
 
 async function getActiveEmployees() {
   return prisma.employee.findMany({
-    where: { isActive: true, role: 'EMPLOYEE' },
+    where: { isActive: true },
     orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
   });
 }
@@ -185,7 +185,10 @@ async function renderStep1(ctx: BotContext) {
     Markup.button.callback('🗑 Очистить', 'nf_s1_clear'),
     Markup.button.callback('Далее →', 'nf_s1_next'),
   ]);
-  keyboard.push([Markup.button.callback('← Отмена', 'nf_filter_cancel')]);
+  keyboard.push([
+    Markup.button.callback('🔄 Сбросить', 'nf_filter_reset'),
+    Markup.button.callback('← Отмена', 'nf_filter_cancel'),
+  ]);
 
   return { text, keyboard };
 }
@@ -212,6 +215,7 @@ function renderStep2(ctx: BotContext) {
     Markup.button.callback('← Назад', 'nf_s2_prev'),
     Markup.button.callback('Далее →', 'nf_s2_next'),
   ]);
+  keyboard.push([Markup.button.callback('🔄 Сбросить', 'nf_filter_reset')]);
 
   return { text, keyboard };
 }
@@ -255,6 +259,7 @@ function renderStep3(ctx: BotContext) {
     Markup.button.callback('← Назад', 'nf_s3_prev'),
     Markup.button.callback('✅ Применить', 'nf_s3_apply'),
   ]);
+  keyboard.push([Markup.button.callback('🔄 Сбросить', 'nf_filter_reset')]);
 
   return { text, keyboard };
 }
@@ -281,7 +286,7 @@ async function editFeed(ctx: BotContext) {
   const result = await renderFeed(ctx);
   if (!result) return;
   try {
-    await ctx.editMessageText(result.text, { reply_markup: { inline_keyboard: result.keyboard } });
+    await ctx.editMessageText(result.text, Markup.inlineKeyboard(result.keyboard));
   } catch {
     await ctx.reply(result.text, Markup.inlineKeyboard(result.keyboard));
   }
@@ -290,7 +295,7 @@ async function editFeed(ctx: BotContext) {
 async function editStep1(ctx: BotContext) {
   const result = await renderStep1(ctx);
   try {
-    await ctx.editMessageText(result.text, { reply_markup: { inline_keyboard: result.keyboard } });
+    await ctx.editMessageText(result.text, Markup.inlineKeyboard(result.keyboard));
   } catch {
     await ctx.reply(result.text, Markup.inlineKeyboard(result.keyboard));
   }
@@ -299,7 +304,7 @@ async function editStep1(ctx: BotContext) {
 async function editStep2(ctx: BotContext) {
   const result = renderStep2(ctx);
   try {
-    await ctx.editMessageText(result.text, { reply_markup: { inline_keyboard: result.keyboard } });
+    await ctx.editMessageText(result.text, Markup.inlineKeyboard(result.keyboard));
   } catch {
     await ctx.reply(result.text, Markup.inlineKeyboard(result.keyboard));
   }
@@ -308,7 +313,7 @@ async function editStep2(ctx: BotContext) {
 async function editStep3(ctx: BotContext) {
   const result = renderStep3(ctx);
   try {
-    await ctx.editMessageText(result.text, { reply_markup: { inline_keyboard: result.keyboard } });
+    await ctx.editMessageText(result.text, Markup.inlineKeyboard(result.keyboard));
   } catch {
     await ctx.reply(result.text, Markup.inlineKeyboard(result.keyboard));
   }
@@ -383,6 +388,17 @@ adminNotificationsScene.action('nf_filter_open', async (ctx) => {
 
 adminNotificationsScene.action('nf_filter_cancel', async (ctx) => {
   await ctx.answerCbQuery();
+  await editFeed(ctx);
+});
+
+adminNotificationsScene.action('nf_filter_reset', async (ctx) => {
+  await ctx.answerCbQuery();
+  ss(ctx).notifFilterEmpIds = '';
+  ss(ctx).notifFilterTypes = '';
+  ss(ctx).notifFilterFrom = undefined;
+  ss(ctx).notifFilterTo = undefined;
+  ss(ctx).notifFilterMode = 'settings';
+  ss(ctx).notifPage = 0;
   await editFeed(ctx);
 });
 
