@@ -157,17 +157,28 @@ async function showReport(ctx: BotContext, from: Date, to: Date): Promise<void> 
   await sendPages(ctx, lines);
 }
 
-async function showEmployeeKeyboard(ctx: BotContext): Promise<void> {
-  const employees = await prisma.employee.findMany({
+const EMP_PAGE_SIZE = 5;
+
+async function showEmployeeKeyboard(ctx: BotContext, page = 0): Promise<void> {
+  const all = await prisma.employee.findMany({
     where: { isActive: true },
     orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
   });
+  const totalPages = Math.ceil(all.length / EMP_PAGE_SIZE);
+  const pageEmps = all.slice(page * EMP_PAGE_SIZE, (page + 1) * EMP_PAGE_SIZE);
 
   const rows: ReturnType<typeof Markup.button.callback>[][] = [
     [Markup.button.callback('👥 Все сотрудники', 'rpt_emp_all')],
-    ...employees.map((e) => [Markup.button.callback(`${e.lastName} ${e.firstName}`, `rpt_emp_${e.id}`)]),
-    [Markup.button.callback('« Назад', 'rpt_emp_back'), Markup.button.callback('📋 Меню', 'go_menu')],
+    ...pageEmps.map((e) => [Markup.button.callback(`${e.lastName} ${e.firstName}`, `rpt_emp_${e.id}`)]),
   ];
+  if (totalPages > 1) {
+    const nav: ReturnType<typeof Markup.button.callback>[] = [];
+    if (page > 0) nav.push(Markup.button.callback('≪ Пред', `rpt_page_${page - 1}`));
+    nav.push(Markup.button.callback(`${page + 1}/${totalPages}`, 'noop'));
+    if (page < totalPages - 1) nav.push(Markup.button.callback('≫ След', `rpt_page_${page + 1}`));
+    rows.push(nav);
+  }
+  rows.push([Markup.button.callback('« Назад', 'rpt_emp_back'), Markup.button.callback('📋 Меню', 'go_menu')]);
 
   await ctx.reply('Выберите сотрудника:', Markup.inlineKeyboard(rows));
 }
@@ -244,7 +255,12 @@ export const adminReportWizard = new Scenes.WizardScene<BotContext>(
 );
 
 // On enter: show employee keyboard
-adminReportWizard.enter(showEmployeeKeyboard);
+adminReportWizard.enter((ctx) => showEmployeeKeyboard(ctx, 0));
+
+adminReportWizard.action(/^rpt_page_(\d+)$/, async (ctx) => {
+  await ctx.answerCbQuery();
+  await showEmployeeKeyboard(ctx, parseInt(ctx.match[1], 10));
+});
 
 // Employee selection actions
 adminReportWizard.action(/^rpt_emp_(\d+)$/, async (ctx) => {
@@ -337,5 +353,5 @@ adminReportWizard.action('rpt_back', async (ctx) => {
   await ctx.answerCbQuery();
   try { await ctx.editMessageReplyMarkup({ inline_keyboard: [[{ text: '📋 Меню', callback_data: 'go_menu' }]] }); } catch {}
   ctx.wizard.selectStep(0);
-  await showEmployeeKeyboard(ctx);
+  await showEmployeeKeyboard(ctx, 0);
 });

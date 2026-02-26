@@ -145,11 +145,16 @@ async function renderFeed(ctx: BotContext) {
 
 // ─── FILTER STEP 1: EMPLOYEES ───────────────────────────────────────────────
 
+const STEP1_PAGE_SIZE = 5;
+
 async function renderStep1(ctx: BotContext) {
-  const employees = await getActiveEmployees();
+  const all = await getActiveEmployees();
   const selectedIds = new Set(
     (ss(ctx).notifFilterEmpIds ?? '').split(',').filter(Boolean).map(Number),
   );
+  const page = ss(ctx).notifFilterEmpPage ?? 0;
+  const totalPages = Math.max(1, Math.ceil(all.length / STEP1_PAGE_SIZE));
+  const pageEmps = all.slice(page * STEP1_PAGE_SIZE, (page + 1) * STEP1_PAGE_SIZE);
 
   const selectedCount = selectedIds.size;
   const empSummary = selectedCount === 0 ? 'все' : `${selectedCount} выбрано`;
@@ -157,7 +162,7 @@ async function renderStep1(ctx: BotContext) {
 
   const keyboard: ReturnType<typeof Markup.button.callback>[][] = [];
 
-  for (const emp of employees) {
+  for (const emp of pageEmps) {
     const checked = selectedIds.has(emp.id);
     keyboard.push([
       Markup.button.callback(
@@ -165,6 +170,15 @@ async function renderStep1(ctx: BotContext) {
         `nf_s1_emp_${emp.id}`,
       ),
     ]);
+  }
+
+  // Pagination within step 1
+  if (totalPages > 1) {
+    const nav: ReturnType<typeof Markup.button.callback>[] = [];
+    if (page > 0) nav.push(Markup.button.callback('≪ Пред', 'nf_s1_emp_prev'));
+    nav.push(Markup.button.callback(`${page + 1}/${totalPages}`, 'noop'));
+    if (page < totalPages - 1) nav.push(Markup.button.callback('≫ След', 'nf_s1_emp_next'));
+    keyboard.push(nav);
   }
 
   keyboard.push([
@@ -363,6 +377,7 @@ adminNotificationsScene.action('nf_back', async (ctx) => {
 adminNotificationsScene.action('nf_filter_open', async (ctx) => {
   await ctx.answerCbQuery();
   ss(ctx).notifFilterStep = 1;
+  ss(ctx).notifFilterEmpPage = 0;
   await editStep1(ctx);
 });
 
@@ -384,6 +399,18 @@ adminNotificationsScene.action(/^nf_s1_emp_(\d+)$/, async (ctx) => {
     current.push(String(empId));
   }
   ss(ctx).notifFilterEmpIds = current.join(',');
+  await editStep1(ctx);
+});
+
+adminNotificationsScene.action('nf_s1_emp_prev', async (ctx) => {
+  await ctx.answerCbQuery();
+  ss(ctx).notifFilterEmpPage = Math.max(0, (ss(ctx).notifFilterEmpPage ?? 0) - 1);
+  await editStep1(ctx);
+});
+
+adminNotificationsScene.action('nf_s1_emp_next', async (ctx) => {
+  await ctx.answerCbQuery();
+  ss(ctx).notifFilterEmpPage = (ss(ctx).notifFilterEmpPage ?? 0) + 1;
   await editStep1(ctx);
 });
 

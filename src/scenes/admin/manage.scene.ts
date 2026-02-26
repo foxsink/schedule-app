@@ -13,36 +13,45 @@ export const ADMIN_MANAGE_SCENE_ID = 'admin_manage';
 // We'll use selectedDate to store wizard sub-state: "set_rate", "set_rate2:N:RATE", "deactivate:N", "new_emp"
 // selectedEmployeeId for current employee
 
-async function showEmployeeList(ctx: BotContext): Promise<void> {
-  const employees = await prisma.employee.findMany({
-    where: { isActive: true },
-    orderBy: { lastName: 'asc' },
-  });
+const EMP_PAGE_SIZE = 5;
 
+function empPageNav(page: number, total: number, prevCb: string, nextCb: string) {
+  const totalPages = Math.ceil(total / EMP_PAGE_SIZE);
+  if (totalPages <= 1) return null;
+  const row: ReturnType<typeof Markup.button.callback>[] = [];
+  if (page > 0) row.push(Markup.button.callback('≪ Пред', prevCb));
+  row.push(Markup.button.callback(`${page + 1}/${totalPages}`, 'noop'));
+  if (page < totalPages - 1) row.push(Markup.button.callback('≫ След', nextCb));
+  return row;
+}
+
+async function showEmployeeList(ctx: BotContext, page = 0): Promise<void> {
+  const all = await prisma.employee.findMany({ where: { isActive: true }, orderBy: { lastName: 'asc' } });
   const inactiveCount = await prisma.employee.count({ where: { isActive: false } });
+  const pageEmps = all.slice(page * EMP_PAGE_SIZE, (page + 1) * EMP_PAGE_SIZE);
 
   const rows: ReturnType<typeof Markup.button.callback>[][] = [
     [Markup.button.callback('➕ Создать сотрудника', 'mgmt_create')],
-    ...employees.map((e) => [Markup.button.callback(`${e.lastName} ${e.firstName}`, `mgmt_emp_${e.id}`)]),
+    ...pageEmps.map((e) => [Markup.button.callback(`${e.lastName} ${e.firstName}`, `mgmt_emp_${e.id}`)]),
   ];
-  if (inactiveCount > 0) {
-    rows.push([Markup.button.callback(`🗂 Неактивные (${inactiveCount})`, 'mgmt_inactive_list')]);
-  }
+  const nav = empPageNav(page, all.length, `mgmt_page_${page - 1}`, `mgmt_page_${page + 1}`);
+  if (nav) rows.push(nav);
+  if (inactiveCount > 0) rows.push([Markup.button.callback(`🗂 Неактивные (${inactiveCount})`, 'mgmt_inactive_list')]);
   rows.push([Markup.button.callback('« Назад', 'mgmt_back'), Markup.button.callback('📋 Меню', 'go_menu')]);
 
   await ctx.reply('👥 Управление сотрудниками:', Markup.inlineKeyboard(rows));
 }
 
-async function showInactiveEmployeeList(ctx: BotContext): Promise<void> {
-  const employees = await prisma.employee.findMany({
-    where: { isActive: false },
-    orderBy: { lastName: 'asc' },
-  });
+async function showInactiveEmployeeList(ctx: BotContext, page = 0): Promise<void> {
+  const all = await prisma.employee.findMany({ where: { isActive: false }, orderBy: { lastName: 'asc' } });
+  const pageEmps = all.slice(page * EMP_PAGE_SIZE, (page + 1) * EMP_PAGE_SIZE);
 
   const rows: ReturnType<typeof Markup.button.callback>[][] = [
-    ...employees.map((e) => [Markup.button.callback(`${e.lastName} ${e.firstName}`, `mgmt_emp_${e.id}`)]),
-    [Markup.button.callback('« К списку', 'mgmt_list'), Markup.button.callback('📋 Меню', 'go_menu')],
+    ...pageEmps.map((e) => [Markup.button.callback(`${e.lastName} ${e.firstName}`, `mgmt_emp_${e.id}`)]),
   ];
+  const nav = empPageNav(page, all.length, `mgmt_ipage_${page - 1}`, `mgmt_ipage_${page + 1}`);
+  if (nav) rows.push(nav);
+  rows.push([Markup.button.callback('« К списку', 'mgmt_list'), Markup.button.callback('📋 Меню', 'go_menu')]);
 
   await ctx.reply('🗂 Неактивные сотрудники:', Markup.inlineKeyboard(rows));
 }
@@ -195,7 +204,7 @@ export const adminManageScene = new Scenes.WizardScene<BotContext>(
   }
 );
 
-adminManageScene.enter(showEmployeeList);
+adminManageScene.enter((ctx) => showEmployeeList(ctx, 0));
 
 adminManageScene.action('mgmt_create', async (ctx) => {
   await ctx.answerCbQuery();
@@ -309,12 +318,22 @@ adminManageScene.action('mgmt_cancel_input', async (ctx) => {
 
 adminManageScene.action('mgmt_list', async (ctx) => {
   await ctx.answerCbQuery();
-  await showEmployeeList(ctx);
+  await showEmployeeList(ctx, 0);
 });
 
 adminManageScene.action('mgmt_inactive_list', async (ctx) => {
   await ctx.answerCbQuery();
-  await showInactiveEmployeeList(ctx);
+  await showInactiveEmployeeList(ctx, 0);
+});
+
+adminManageScene.action(/^mgmt_page_(\d+)$/, async (ctx) => {
+  await ctx.answerCbQuery();
+  await showEmployeeList(ctx, parseInt(ctx.match[1], 10));
+});
+
+adminManageScene.action(/^mgmt_ipage_(\d+)$/, async (ctx) => {
+  await ctx.answerCbQuery();
+  await showInactiveEmployeeList(ctx, parseInt(ctx.match[1], 10));
 });
 
 adminManageScene.action('mgmt_back', async (ctx) => {

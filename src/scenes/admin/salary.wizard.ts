@@ -36,16 +36,28 @@ const PERIOD_KEYBOARD = Markup.inlineKeyboard([
   [Markup.button.callback('« Назад', 'sal_period_back'), Markup.button.callback('📋 Меню', 'go_menu')],
 ]);
 
-async function showEmployeeList(ctx: BotContext): Promise<void> {
-  const employees = await prisma.employee.findMany({
+const EMP_PAGE_SIZE = 5;
+
+async function showEmployeeList(ctx: BotContext, page = 0): Promise<void> {
+  const all = await prisma.employee.findMany({
     where: { isActive: true },
     orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
   });
+  const totalPages = Math.ceil(all.length / EMP_PAGE_SIZE);
+  const pageEmps = all.slice(page * EMP_PAGE_SIZE, (page + 1) * EMP_PAGE_SIZE);
+
   const rows: ReturnType<typeof Markup.button.callback>[][] = [
     [Markup.button.callback('👥 Все сотрудники', 'sal_emp_all')],
-    ...employees.map((e) => [Markup.button.callback(`${e.lastName} ${e.firstName}`, `sal_emp_${e.id}`)]),
-    [Markup.button.callback('« Назад', 'sal_back'), Markup.button.callback('📋 Меню', 'go_menu')],
+    ...pageEmps.map((e) => [Markup.button.callback(`${e.lastName} ${e.firstName}`, `sal_emp_${e.id}`)]),
   ];
+  if (totalPages > 1) {
+    const nav: ReturnType<typeof Markup.button.callback>[] = [];
+    if (page > 0) nav.push(Markup.button.callback('≪ Пред', `sal_page_${page - 1}`));
+    nav.push(Markup.button.callback(`${page + 1}/${totalPages}`, 'noop'));
+    if (page < totalPages - 1) nav.push(Markup.button.callback('≫ След', `sal_page_${page + 1}`));
+    rows.push(nav);
+  }
+  rows.push([Markup.button.callback('« Назад', 'sal_back'), Markup.button.callback('📋 Меню', 'go_menu')]);
   await ctx.reply('Выберите сотрудника для расчёта зарплаты:', Markup.inlineKeyboard(rows));
 }
 
@@ -229,7 +241,12 @@ export const adminSalaryWizard = new Scenes.WizardScene<BotContext>(
   }
 );
 
-adminSalaryWizard.enter(showEmployeeList);
+adminSalaryWizard.enter((ctx) => showEmployeeList(ctx, 0));
+
+adminSalaryWizard.action(/^sal_page_(\d+)$/, async (ctx) => {
+  await ctx.answerCbQuery();
+  await showEmployeeList(ctx, parseInt(ctx.match[1], 10));
+});
 
 adminSalaryWizard.action(/^sal_emp_(\d+)$/, async (ctx) => {
   await ctx.answerCbQuery();
@@ -442,7 +459,7 @@ adminSalaryWizard.action('sal_period_back', async (ctx) => {
   await ctx.answerCbQuery();
   try { await ctx.editMessageReplyMarkup({ inline_keyboard: [[{ text: '📋 Меню', callback_data: 'go_menu' }]] }); } catch {}
   ctx.wizard.selectStep(0);
-  await showEmployeeList(ctx);
+  await showEmployeeList(ctx, 0);
 });
 
 // From salary result → back to period selection

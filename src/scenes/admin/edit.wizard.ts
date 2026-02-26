@@ -19,15 +19,27 @@ const TYPE_LABELS: Record<TimeEntryType, string> = {
   SICK_LEAVE: 'Больничный',
 };
 
-async function showEmployeeList(ctx: BotContext): Promise<void> {
-  const employees = await prisma.employee.findMany({
+const EMP_PAGE_SIZE = 5;
+
+async function showEmployeeList(ctx: BotContext, page = 0): Promise<void> {
+  const all = await prisma.employee.findMany({
     where: { isActive: true },
     orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
   });
+  const totalPages = Math.ceil(all.length / EMP_PAGE_SIZE);
+  const pageEmps = all.slice(page * EMP_PAGE_SIZE, (page + 1) * EMP_PAGE_SIZE);
+
   const rows: ReturnType<typeof Markup.button.callback>[][] = [
-    ...employees.map((e) => [Markup.button.callback(`${e.lastName} ${e.firstName}`, `edit_emp_${e.id}`)]),
-    [Markup.button.callback('« Назад', 'edit_emp_back')],
+    ...pageEmps.map((e) => [Markup.button.callback(`${e.lastName} ${e.firstName}`, `edit_emp_${e.id}`)]),
   ];
+  if (totalPages > 1) {
+    const nav: ReturnType<typeof Markup.button.callback>[] = [];
+    if (page > 0) nav.push(Markup.button.callback('≪ Пред', `edit_page_${page - 1}`));
+    nav.push(Markup.button.callback(`${page + 1}/${totalPages}`, 'noop'));
+    if (page < totalPages - 1) nav.push(Markup.button.callback('≫ След', `edit_page_${page + 1}`));
+    rows.push(nav);
+  }
+  rows.push([Markup.button.callback('« Назад', 'edit_emp_back')]);
   await ctx.reply('Выберите сотрудника:', Markup.inlineKeyboard(rows));
 }
 
@@ -428,7 +440,12 @@ export const adminEditWizard = new Scenes.WizardScene<BotContext>(
   }
 );
 
-adminEditWizard.enter(showEmployeeList);
+adminEditWizard.enter((ctx) => showEmployeeList(ctx, 0));
+
+adminEditWizard.action(/^edit_page_(\d+)$/, async (ctx) => {
+  await ctx.answerCbQuery();
+  await showEmployeeList(ctx, parseInt(ctx.match[1], 10));
+});
 
 // Employee selection
 adminEditWizard.action(/^edit_emp_(\d+)$/, async (ctx) => {
