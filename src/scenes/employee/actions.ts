@@ -1,5 +1,6 @@
 import { BotContext } from '../../types/context';
 import { timeEntryService } from '../../services/timeEntry.service';
+import { notificationService } from '../../services/notification.service';
 import { buildEmployeeKeyboard } from '../../keyboards/employee.keyboard';
 import { formatDate, formatTime } from '../../utils/time';
 import { TimeEntryType } from '../../generated/prisma/client';
@@ -39,10 +40,10 @@ export function registerEmployeeActions(bot: Telegraf<BotContext>) {
 
       const type = ACTION_TYPE_MAP[action];
 
+      const now = new Date();
       try {
         await timeEntryService.addEntry(ctx.employee.id, type);
         await ctx.answerCbQuery();
-        const now = new Date();
         await ctx.editMessageText(
           `${ACTION_MESSAGES[action]} в ${formatTime(now)}`,
           {
@@ -56,6 +57,19 @@ export function registerEmployeeActions(bot: Telegraf<BotContext>) {
         await ctx.answerCbQuery('Действие недоступно', { show_alert: true });
         return;
       }
+
+      // Fire-and-forget: persist notification + push to admins
+      notificationService.createNotification(ctx.employee.id, type, now).catch(() => {});
+      notificationService.getAdminsToPush(ctx.employee.id, type)
+        .then(async (admins) => {
+          const text = notificationService.formatPushMessage(ctx.employee!, type, now);
+          for (const admin of admins) {
+            if (!admin.telegramId) continue;
+            try { await ctx.telegram.sendMessage(admin.telegramId.toString(), text); }
+            catch {}
+          }
+        })
+        .catch(() => {});
 
       // Re-render menu
       const newActions = await timeEntryService.getAvailableActions(ctx.employee.id);
