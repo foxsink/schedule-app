@@ -112,6 +112,12 @@ export function createBot(): Telegraf<BotContext> {
     return ctx.reply('Используйте /menu для открытия меню или /cancel для отмены текущего действия.');
   });
 
+  // Register bot commands (shown in "/" menu in Telegram)
+  bot.telegram.setMyCommands([
+    { command: 'menu',   description: 'Открыть главное меню' },
+    { command: 'cancel', description: 'Отменить текущее действие' },
+  ]).catch(() => {});
+
   // Global error handler
   bot.catch((err, ctx) => {
     console.error(`Error for user ${ctx.from?.id}:`, err);

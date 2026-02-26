@@ -4,7 +4,7 @@ import { notificationService } from '../../services/notification.service';
 import { buildEmployeeKeyboard } from '../../keyboards/employee.keyboard';
 import { formatDate, formatTime } from '../../utils/time';
 import { TimeEntryType } from '../../generated/prisma/client';
-import { Telegraf } from 'telegraf';
+import { Telegraf, Markup } from 'telegraf';
 import { HISTORY_SCENE_ID } from './history.scene';
 
 const ACTION_MESSAGES: Record<string, string> = {
@@ -63,9 +63,10 @@ export function registerEmployeeActions(bot: Telegraf<BotContext>) {
       notificationService.getAdminsToPush(ctx.employee.id, type)
         .then(async (admins) => {
           const text = notificationService.formatPushMessage(ctx.employee!, type, now);
+          const menuButton = Markup.inlineKeyboard([[Markup.button.callback('📋 Меню', 'go_menu')]]);
           for (const admin of admins) {
             if (!admin.telegramId) continue;
-            try { await ctx.telegram.sendMessage(admin.telegramId.toString(), text); }
+            try { await ctx.telegram.sendMessage(admin.telegramId.toString(), text, menuButton); }
             catch {}
           }
         })
