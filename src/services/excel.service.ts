@@ -72,8 +72,8 @@ export const excelService = {
     const detailSheet = wb.addSheet('Детализация');
 
     setupHeaders(detailSheet,
-      ['Дата', 'Сотрудник', 'Начало', 'Конец', 'Обед (ч)', 'Отлучки (ч)', 'Часы', 'Ставка', 'Сумма', 'Премии', 'Штрафы'],
-      [14, 25, 10, 10, 10, 12, 8, 10, 12, 12, 12],
+      ['Дата', 'Сотрудник', 'Начало', 'Конец', 'Обед (ч)', 'Отлучки (ч)', 'Часы', 'Ставка', 'Сумма', 'Премии', 'Штрафы', 'Итого'],
+      [14, 25, 10, 10, 10, 12, 8, 10, 12, 12, 12, 12],
     );
 
     let detailRow = 2;
@@ -116,21 +116,27 @@ export const excelService = {
         const isSick = entries.some((e) => e.type === TimeEntryType.SICK_LEAVE);
         const dayAdj = adjByDate.get(day.date);
 
+        const lunchH = Math.round((lunchMs  / 3_600_000) * 100) / 100;
+        const leaveH = Math.round((leavesMs / 3_600_000) * 100) / 100;
+        const dayNet = (day.amount ?? 0) + (dayAdj?.bonuses ?? 0) - (dayAdj?.penalties ?? 0);
+
         [
           formatDate(date),
           `${result.lastName} ${result.firstName}`,
           day.workStart ?? (isSick ? 'Больничный' : '—'),
           day.workEnd   ?? '—',
-          Math.round((lunchMs  / 3_600_000) * 100) / 100 || null,
-          Math.round((leavesMs / 3_600_000) * 100) / 100 || null,
+          lunchH  || null,
+          leaveH  || null,
           day.netHours || null,
           day.rate     || null,
           day.amount   || null,
           dayAdj?.bonuses   || null,
           dayAdj?.penalties || null,
+          dayNet || null,
         ].forEach((v, i) => detailSheet.cell(detailRow, i + 1).value(v));
         detailRow++;
       }
+
     }
 
     // ── Sheet 3: Корректировки ─────────────────────────────────────────────────
@@ -155,7 +161,6 @@ export const excelService = {
           a.amount,
           a.reason,
         ].forEach((v, i) => adjSheet.cell(adjRow, i + 1).value(v));
-        // Highlight type and amount cells
         adjSheet.cell(adjRow, 3).style((s) => s.fontColor(color));
         adjSheet.cell(adjRow, 4).style((s) => s.fontColor(color));
         adjRow++;

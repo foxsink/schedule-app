@@ -87,9 +87,13 @@ async function renderFeed(ctx: BotContext) {
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-  const tabLabel = tab === 'all'
-    ? (filterMode === 'settings' ? '🔔 Уведомления · По push-настройкам' : '🔔 Уведомления · Фильтр')
-    : '⭐ Закладки';
+  const tabLabel = tab === 'bookmarks'
+    ? '⭐ Закладки'
+    : filterMode === 'settings'
+      ? '🔔 Push-уведомления'
+      : (ss(ctx).notifFilterEmpIds || ss(ctx).notifFilterTypes || ss(ctx).notifFilterFrom || ss(ctx).notifFilterTo)
+        ? '📥 Уведомления · Фильтр'
+        : '📥 Все уведомления';
 
   let text = tabLabel + '\n';
   if (tab === 'all') text += `Непрочитанных: ${unreadTotal}\n`;
@@ -109,8 +113,8 @@ async function renderFeed(ctx: BotContext) {
   const keyboard: ReturnType<typeof Markup.button.callback>[][] = [];
 
   keyboard.push([
-    Markup.button.callback(tab === 'all' ? '[📥 Все]' : '📥 Все', 'nf_tab_all'),
-    Markup.button.callback(tab === 'bookmarks' ? '[⭐ Закладки]' : '⭐ Закладки', 'nf_tab_bookmarks'),
+    Markup.button.callback(tab === 'all' && filterMode === 'custom' ? '[📥 Все]' : '📥 Все', 'nf_tab_all'),
+    Markup.button.callback(tab === 'all' && filterMode === 'settings' ? '[🔔 Push]' : '🔔 Push', 'nf_tab_push'),
   ]);
 
   for (let i = 0; i < items.length; i++) {
@@ -140,6 +144,7 @@ async function renderFeed(ctx: BotContext) {
   if (page < totalPages - 1) navRow.push(Markup.button.callback('≫ След', 'nf_page_next'));
   keyboard.push(navRow);
 
+  keyboard.push([Markup.button.callback(tab === 'bookmarks' ? '[⭐ Закладки]' : '⭐ Закладки', 'nf_tab_bookmarks')]);
   keyboard.push([Markup.button.callback('🔔 Push-настройки', 'nf_push_settings')]);
   keyboard.push([Markup.button.callback('← Назад в меню', 'nf_back')]);
 
@@ -322,6 +327,20 @@ async function editStep3(ctx: BotContext) {
 adminNotificationsScene.action('nf_tab_all', async (ctx) => {
   await ctx.answerCbQuery();
   ss(ctx).notifTab = 'all';
+  ss(ctx).notifFilterMode = 'custom';
+  ss(ctx).notifFilterEmpIds = '';
+  ss(ctx).notifFilterTypes = '';
+  ss(ctx).notifFilterFrom = undefined;
+  ss(ctx).notifFilterTo = undefined;
+  ss(ctx).notifPage = 0;
+  if (ctx.employee) notificationService.markAllRead(ctx.employee.id).catch(() => {});
+  await editFeed(ctx);
+});
+
+adminNotificationsScene.action('nf_tab_push', async (ctx) => {
+  await ctx.answerCbQuery();
+  ss(ctx).notifTab = 'all';
+  ss(ctx).notifFilterMode = 'settings';
   ss(ctx).notifPage = 0;
   if (ctx.employee) notificationService.markAllRead(ctx.employee.id).catch(() => {});
   await editFeed(ctx);
