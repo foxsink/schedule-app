@@ -86,6 +86,9 @@ async function showReport(ctx: BotContext, from: Date, to: Date): Promise<void> 
         } else {
           lines.push(`    🕐 ${d.workStart} – ${d.workEnd}`);
           if (d.lunchStart && d.lunchEnd) lines.push(`    🍽 ${d.lunchStart} – ${d.lunchEnd}`);
+          if (d.personalLeaves) {
+            for (const pl of d.personalLeaves) lines.push(`    🚶 ${pl.start} – ${pl.end}`);
+          }
           lines.push(`    ⏱ ${hoursStr(d.netHours)} × ${fmtMoney(d.rate)}/ч = *${fmtMoney(d.amount)}*`);
         }
       }
@@ -132,6 +135,9 @@ async function showReport(ctx: BotContext, from: Date, to: Date): Promise<void> 
     } else {
       lines.push(`  🕐 ${d.workStart} – ${d.workEnd}`);
       if (d.lunchStart && d.lunchEnd) lines.push(`  🍽 ${d.lunchStart} – ${d.lunchEnd}`);
+      if (d.personalLeaves) {
+        for (const pl of d.personalLeaves) lines.push(`  🚶 ${pl.start} – ${pl.end}`);
+      }
       lines.push(`  ⏱ ${hoursStr(d.netHours)} × ${fmtMoney(d.rate)}/ч = *${fmtMoney(d.amount)}*`);
     }
     lines.push('');

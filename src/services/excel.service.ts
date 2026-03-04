@@ -40,13 +40,11 @@ export const excelService = {
 
     let salaryRow = 2;
     for (const r of results) {
-      const avgRate = r.totalWorkedHours > 0
-        ? Math.round((r.grossSalary / r.totalWorkedHours) * 100) / 100
-        : 0;
+      const lastRate = r.days.find((d) => !d.sickLeave && d.rate > 0)?.rate ?? 0;
       [
         `${r.lastName} ${r.firstName}`,
         r.totalWorkedHours,
-        avgRate,
+        lastRate,
         r.grossSalary,
         r.bonuses,
         r.penalties,

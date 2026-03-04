@@ -13,6 +13,7 @@ export interface DaySalary {
   workEnd?: string;
   lunchStart?: string;
   lunchEnd?: string;
+  personalLeaves?: { start: string; end: string }[];
 }
 
 export interface AdjustmentItem {
@@ -170,6 +171,14 @@ export const salaryService = {
       totalWorkedMs += ms;
       grossSalary += amount;
 
+      const personalLeaves: { start: string; end: string }[] = [];
+      for (let i = 0; i < pairs; i++) {
+        personalLeaves.push({
+          start: formatTime(plStarts[i].timestamp),
+          end: formatTime(plEnds[i].timestamp),
+        });
+      }
+
       days.push({
         date: dateKey,
         shiftStartDate,
@@ -180,6 +189,7 @@ export const salaryService = {
         workEnd: formatTime(workEnd.timestamp),
         lunchStart: ls ? formatTime(ls.timestamp) : undefined,
         lunchEnd: le ? formatTime(le.timestamp) : undefined,
+        personalLeaves: personalLeaves.length > 0 ? personalLeaves : undefined,
       });
     }
 
