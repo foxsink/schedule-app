@@ -2,6 +2,7 @@ node_modules/
 dist/
 src/generated/
 .env
+.env.dev
 prisma/*.db
 .claude/
 .vscode/

@@ -1,4 +1,6 @@
 import dotenv from 'dotenv';
+// .env.dev takes priority; .env fills in any missing vars
+dotenv.config({ path: '.env.dev' });
 dotenv.config();
 
 function required(name: string): string {
@@ -17,7 +19,7 @@ export const config = {
   superAdminTelegramId: process.env.SUPER_ADMIN_TELEGRAM_ID
     ? BigInt(process.env.SUPER_ADMIN_TELEGRAM_ID)
     : undefined,
-  superAdminFirstName: process.env.SUPER_ADMIN_FIRST_NAME || 'Влад',
-  superAdminLastName: process.env.SUPER_ADMIN_LAST_NAME || 'Управляющий',
+  superAdminFirstName: process.env.SUPER_ADMIN_FIRST_NAME || 'admin',
+  superAdminLastName: process.env.SUPER_ADMIN_LAST_NAME || 'admin',
   TZ_OFFSET: 7,
 } as const;
