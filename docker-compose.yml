@@ -9,6 +9,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
+    restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
@@ -22,6 +23,8 @@ services:
         condition: service_healthy
     env_file:
       - .env
+      - path: .env.dev
+        required: false
     environment:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/schedule_app
     restart: unless-stopped
