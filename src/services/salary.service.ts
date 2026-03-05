@@ -1,6 +1,6 @@
 import { prisma } from '../prisma';
 import { AdjustmentType, TimeEntryType } from '../generated/prisma/client';
-import { formatTime } from '../utils/time';
+import { formatTime, roundMsToMin } from '../utils/time';
 
 export interface DaySalary {
   date: string; // YYYY-MM-DD (calendar date of entries)
@@ -163,8 +163,7 @@ export const salaryService = {
         ms -= plEnds[i].timestamp.getTime() - plStarts[i].timestamp.getTime();
       }
       if (ms < 0) ms = 0;
-      // Round to nearest minute to match HH:MM display (timestamps include seconds)
-      ms = Math.round(ms / 60_000) * 60_000;
+      ms = roundMsToMin(ms);
 
       const netHours = ms / 3_600_000;
       const rate = await this.getRateForDate(employeeId, date);

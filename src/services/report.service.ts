@@ -1,6 +1,6 @@
 import { prisma } from '../prisma';
 import { TimeEntryType } from '../generated/prisma/client';
-import { todayDateUTC7, formatTime } from '../utils/time';
+import { todayDateUTC7, formatTime, roundMsToMin } from '../utils/time';
 
 export type EmployeeStatus =
   | { kind: 'not_started' }
@@ -49,8 +49,9 @@ function calcMs(entries: Array<{ type: TimeEntryType; timestamp: Date }>): numbe
 }
 
 export function msToHoursStr(ms: number): string {
-  const h = Math.floor(ms / 3_600_000);
-  const m = Math.floor((ms % 3_600_000) / 60_000);
+  const rounded = roundMsToMin(ms);
+  const h = Math.floor(rounded / 3_600_000);
+  const m = (rounded % 3_600_000) / 60_000;
   return m > 0 ? `${h}ч ${m}м` : `${h}ч`;
 }
 

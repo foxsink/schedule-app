@@ -82,3 +82,8 @@ export function previousWeekUTC7(): [Date, Date] {
   const prevMondayMs = mon.getTime() - 7 * 86_400_000;
   return [new Date(prevMondayMs), new Date(prevMondayMs + 6 * 86_400_000)];
 }
+
+/** Round milliseconds to nearest minute (strips sub-minute precision). */
+export function roundMsToMin(ms: number): number {
+  return Math.round(ms / 60_000) * 60_000;
+}
