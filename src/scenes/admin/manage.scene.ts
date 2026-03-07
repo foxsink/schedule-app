@@ -56,6 +56,11 @@ async function showInactiveEmployeeList(ctx: BotContext, page = 0): Promise<void
   await ctx.reply('🗂 Неактивные сотрудники:', Markup.inlineKeyboard(rows));
 }
 
+/** Escape Telegram legacy Markdown special characters in user-provided strings. */
+function escMd(s: string): string {
+  return s.replace(/[_*`[]/g, (c) => `\\${c}`);
+}
+
 async function showEmployeeCard(ctx: BotContext, employeeId: number): Promise<void> {
   const emp = await prisma.employee.findUnique({
     where: { id: employeeId },
@@ -67,16 +72,16 @@ async function showEmployeeCard(ctx: BotContext, employeeId: number): Promise<vo
   const rateStr = rate ? `${Number(rate.rate)} руб/ч (с ${formatDate(rate.effectiveFrom)})` : 'не установлена';
   const statusStr = emp.isActive ? '✅ активен' : '❌ деактивирован';
   const tgStr = emp.telegramId
-    ? emp.telegramUsername ? `@${emp.telegramUsername}` : `ID: ${emp.telegramId}`
+    ? emp.telegramUsername ? `@${escMd(emp.telegramUsername)}` : `ID: ${emp.telegramId}`
     : 'не привязан';
   const codeStr = emp.invitationCode ? `Код: \`${emp.invitationCode}\`` : 'код использован';
 
   const roleStr = emp.role === 'SUPER_ADMIN' ? '👑 Супер-админ' : emp.role === 'ADMIN' ? '🔧 Админ' : '👤 Сотрудник';
-  const phoneStr = emp.phone ?? 'не указан';
-  const addressStr = emp.address ?? 'не указан';
-  const emergencyStr = emp.emergencyPhone ?? 'не указан';
+  const phoneStr = escMd(emp.phone ?? 'не указан');
+  const addressStr = escMd(emp.address ?? 'не указан');
+  const emergencyStr = escMd(emp.emergencyPhone ?? 'не указан');
   const lines = [
-    `👤 *${emp.lastName} ${emp.firstName}*`,
+    `👤 *${escMd(emp.lastName)} ${escMd(emp.firstName)}*`,
     `Роль: ${roleStr}`,
     `Статус: ${statusStr}`,
     `Telegram: ${tgStr}`,

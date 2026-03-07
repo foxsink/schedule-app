@@ -1,5 +1,4 @@
 .PHONY: up down restart rebuild logs db dev
-
 # Поднять всё (БД + бот)
 up:
 	docker compose up -d

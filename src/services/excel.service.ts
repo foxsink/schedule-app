@@ -34,17 +34,20 @@ export const excelService = {
     const salarySheet = wb.sheet(0)!.name('Зарплаты');
 
     setupHeaders(salarySheet,
-      ['Сотрудник', 'Часы', 'Ставка (руб/ч)', 'Начислено', 'Премии', 'Штрафы', 'Итого'],
+      ['Сотрудник', 'Часы', 'Ср. ставка (руб/ч)', 'Начислено', 'Премии', 'Штрафы', 'Итого'],
       [25, 10, 16, 14, 12, 12, 14],
     );
 
     let salaryRow = 2;
     for (const r of results) {
-      const lastRate = r.days.find((d) => !d.sickLeave && d.rate > 0)?.rate ?? 0;
+      const workDaysWithRate = r.days.filter((d) => !d.sickLeave && d.rate > 0);
+      const avgRate = workDaysWithRate.length > 0
+        ? Math.round(workDaysWithRate.reduce((s, d) => s + d.rate, 0) / workDaysWithRate.length)
+        : 0;
       [
         `${r.lastName} ${r.firstName}`,
         r.totalWorkedHours,
-        lastRate,
+        avgRate,
         r.grossSalary,
         r.bonuses,
         r.penalties,
